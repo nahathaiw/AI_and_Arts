@@ -1,118 +1,282 @@
-# The Many Lives of One Face — Starter Code
+# The Many Lives of One Face
 
-This is a VS Code starter project for a hybrid AI art demo:
+**AI + Art Final Project** — An interactive web gallery showcasing one person's identity through eight different transformations using AI-generated portraiture.
 
-- Static curated gallery with 8 pre-generated portraits
-- One live AI generation button using a backend API
-- Safe fallback to curated images if live generation fails
+## Project Overview
 
-## 1. Open in VS Code
+This project explores identity and multiplicity by transforming a single base face image into eight distinct personas using AI image generation. The gallery features:
 
-Unzip this folder, then open the folder named:
+- **Curated Gallery**: 8 pre-generated AI portraits representing different identity concepts
+- **Live Generation Button**: Real-time Gemini API integration for on-demand generation
+- **Fallback Logic**: Graceful degradation to curated images if live generation fails
+- **Gemini Backend**: Secure API key management and base64 image processing
 
-```txt
-many-lives-one-face-starter
+### The Eight Identities
+
+1. **Present Self** — You as you are now
+2. **Childhood Self** — Your younger self
+3. **Elderly Self** — Your future at age 75+
+4. **Professor Self** — You as an academic
+5. **Football Player Self** — You as an athlete
+6. **Gender-Switched Self** — An alternate gender presentation
+7. **Artist Self** — You as a creative practitioner
+8. **Business Self** — You as a business professional
+
+## Quick Start
+
+### Prerequisites
+
+- Node.js 16+ and npm
+- Google Gemini API key (free tier available at [ai.google.dev](https://ai.google.dev))
+
+### Installation
+
+1. **Install dependencies**
+   ```bash
+   npm install
+   npm run install:all
+   ```
+
+2. **Set up your Gemini API key**
+   
+   Create `backend/.env`:
+   ```bash
+   cp backend/.env.example backend/.env
+   ```
+   
+   Then edit `backend/.env`:
+   ```env
+   GEMINI_API_KEY=your_real_gemini_api_key_here
+   PORT=5050
+   GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
+   ```
+   
+   ⚠️ **Never commit `.env` to GitHub**
+
+3. **Prepare your images**
+   
+   Replace placeholder images with your own:
+   - `frontend/public/images/base_face.png` — Reference face
+   - `frontend/public/images/0[1-8]_*.png` — 8 identity portraits
+   - `backend/base_face.png` — Same reference face for API calls
+
+4. **Run the project**
+   ```bash
+   npm run dev
+   ```
+   
+   Open your browser:
+   - Frontend: http://localhost:5173
+   - Backend API: http://localhost:5050
+
+## Project Structure
+
+```
+.
+├── backend/
+│   ├── server.js           # Express + Gemini API integration
+│   ├── prompts.js          # 8 identity-specific prompts
+│   ├── base_face.png       # Reference image for generation
+│   ├── .env                # Gemini API key (not in git)
+│   └── package.json
+│
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx         # Main state & API orchestration
+│   │   ├── main.jsx        # React entry point
+│   │   ├── styles.css      # Gallery styling
+│   │   ├── data/
+│   │   │   └── identities.js    # 8 identities + descriptions
+│   │   └── components/
+│   │       ├── Gallery.jsx      # Main UI layout
+│   │       └── IdentityCard.jsx # Identity button component
+│   ├── public/
+│   │   └── images/         # 8 curated portraits + base face
+│   └── package.json
+│
+├── package.json            # Root workspace config
+└── README.md
 ```
 
-in VS Code.
+## How It Works
 
-## 2. Install dependencies
+### User Workflow
 
-Open the VS Code terminal and run:
+1. **View Gallery** — Open the app, see the base face and all 8 identity buttons
+2. **Select Identity** — Click an identity card to see its curated portrait
+3. **Generate Live Version** — Click "Generate New Version" to call the Gemini API
+4. **View Result** — See the newly generated image or fallback to curated version
+
+### Technical Flow
+
+```
+Frontend (React)
+    ↓
+[User clicks "Generate New Version"]
+    ↓
+axios POST /api/generate { identityId: "professor" }
+    ↓
+Backend (Express)
+    ├─ Load backend/base_face.png
+    ├─ Find prompt for identity
+    ├─ Call Gemini API with:
+    │  - Detailed artistic prompt
+    │  - Base face image as reference
+    └─ Return base64 image or error
+    ↓
+Frontend Display
+    ├─ Success? Show generated image
+    └─ Failed? Show curated backup + error message
+```
+
+## Key Files to Customize
+
+### 1. Update Identity Descriptions
+**File:** `frontend/src/data/identities.js`
+
+```javascript
+{
+  id: "present",
+  title: "The Present Self",
+  image: "/images/01_present_self.png",
+  description: "Your own description here"
+}
+```
+
+### 2. Refine Generation Prompts
+**File:** `backend/prompts.js`
+
+Each identity has a detailed prompt that guides Gemini:
+```javascript
+present: {
+  title: "The Present Self",
+  prompt: "Your custom prompt emphasizing what this identity means..."
+}
+```
+
+### 3. Add Your Images
+
+Replace all placeholder images:
+- `frontend/public/images/base_face.png`
+- `frontend/public/images/01_present_self.png` through `08_business_self.png`
+- `backend/base_face.png` (same as base_face.png)
+
+## Running Commands
 
 ```bash
-npm install
-npm run install:all
-```
+# Install all dependencies
+npm install && npm run install:all
 
-## 3. Add your API key
-
-Go to:
-
-```txt
-backend/.env.example
-```
-
-Duplicate it and rename the copy to:
-
-```txt
-backend/.env
-```
-
-Then replace:
-
-```env
-OPENAI_API_KEY=replace_this_with_your_api_key
-```
-
-with your real API key.
-
-Do not upload `.env` to GitHub.
-
-## 4. Replace placeholder images
-
-Replace the placeholder images inside:
-
-```txt
-frontend/public/images/
-```
-
-with your actual images:
-
-```txt
-base_face.png
-01_present_self.png
-02_childhood_self.png
-03_elderly_self.png
-04_professor_self.png
-05_football_player_self.png
-06_gender_switched_self.png
-07_artist_self.png
-08_business_self.png
-```
-
-Also replace this backend file with the same base face:
-
-```txt
-backend/base_face.png
-```
-
-## 5. Run the project
-
-From the root folder, run:
-
-```bash
+# Development (both frontend and backend)
 npm run dev
+
+# Frontend only
+npm run dev --prefix frontend
+
+# Backend only
+npm run dev --prefix backend
+
+# Build frontend for production
+npm run build --prefix frontend
 ```
 
-You should see:
+## Troubleshooting
 
-- Backend: http://localhost:5050
-- Frontend: usually http://localhost:5173
+| Issue | Solution |
+|-------|----------|
+| `GEMINI_API_KEY not found` | Check that `backend/.env` exists with your actual API key |
+| `Cannot find module @google/genai` | Run `npm install` in backend folder |
+| `Base face image not found` | Ensure `backend/base_face.png` exists |
+| `Frontend can't connect to backend` | Check that backend is running on port 5050 |
+| `Gemini returns text instead of image` | Verify model name in `.env`; try `gemini-2.5-flash-image` |
+| `CORS errors` | Backend has CORS enabled; ensure frontend URL is trusted |
+| `Live generation is slow` | Expected during heavy API load; fallback ensures stability |
 
-Open the frontend URL in your browser.
+## Presentation Tips
 
-## 6. How the demo works
+### Demo Script
 
-1. Click one of the 8 identity buttons.
-2. The curated portrait appears immediately.
-3. Click **Generate New Version**.
-4. The frontend sends the selected identity to the backend.
-5. The backend sends the base face and prompt to the image API.
-6. The generated image appears.
-7. If generation fails, the app shows the curated image instead.
+> *"This project explores how a single identity can be multiplied into different possible selves. I started with a base face—my own—and used AI to imagine eight different versions: how I looked as a child, how I might look as an elder, how I appear in different professional contexts. The static gallery shows the curated final artworks that comprise the project. The 'Generate New Version' button demonstrates the real-time Gemini API workflow, showing how AI can remix the same face into new contexts. If live generation is slow or fails, the app gracefully falls back to the curated version, because the artwork prioritizes artistic curation over unpredictable live generation."*
 
-## 7. Files you will edit most
+### What to Highlight
 
-```txt
-frontend/src/data/identities.js
-backend/prompts.js
-frontend/public/images/
-backend/base_face.png
+1. **Curated vs. Live** — Explain that the gallery is the final artwork; live generation is a bonus demo
+2. **Artistic Choice** — Emphasize that you selected the best versions, not just the first AI output
+3. **Respecting Consent** — If using a real person's face, note that you have their permission
+4. **Technical Integration** — Show the fallback mechanism and error handling
+5. **Conceptual Vision** — Connect the eight identities to your personal narrative or artistic statement
+
+## Technology Stack
+
+- **Frontend**: React 18, Vite, Axios
+- **Backend**: Node.js, Express, Google GenAI SDK
+- **APIs**: Google Gemini Image Generation
+- **Styling**: CSS (no frameworks)
+
+## System Requirements
+
+- **Node.js**: 16.x or higher
+- **npm**: 7.x or higher
+- **Gemini API Key**: Free tier available
+- **Browser**: Modern browser with ES6 support
+- **RAM**: 512MB+ (for image processing)
+
+## API Endpoints
+
+### GET `/`
+Health check endpoint.
+
+**Response:**
+```json
+{
+  "message": "Many Lives of One Face Gemini backend is running."
+}
 ```
 
-## 8. Presentation explanation
+### POST `/api/generate`
+Generate a new portrait for the selected identity.
 
-You can say:
+**Request:**
+```json
+{
+  "identityId": "professor"
+}
+```
 
-> The gallery mode shows the curated final AI artworks. The live generation button demonstrates the real-time AI workflow. If the API is slow or fails, the website falls back to the curated version, because the final artwork depends on artistic selection, not only live generation.
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "provider": "gemini",
+  "model": "gemini-2.5-flash-image",
+  "title": "The Professor Self",
+  "promptUsed": "...",
+  "image": "data:image/png;base64,..."
+}
+```
+
+**Fallback Response (500):**
+```json
+{
+  "success": false,
+  "fallback": true,
+  "error": "Live Gemini generation failed. Showing curated gallery image instead."
+}
+```
+
+## Notes
+
+- The base face image should be a clear, well-lit portrait (ideally a professional headshot)
+- Prompts are designed to maintain facial identity while transforming context
+- Live generation typically takes 2-10 seconds depending on API load
+- The curated gallery is fast (pre-generated images load instantly)
+
+## License
+
+This project is for educational purposes. Please respect copyright and obtain proper permissions before using real people's faces.
+
+## Credits
+
+- **Concept & Design**: Student Project
+- **AI Technology**: Google Gemini API
+- **Framework**: React + Express
