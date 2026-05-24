@@ -2,14 +2,34 @@ import { useState } from "react";
 import axios from "axios";
 import { identities } from "./data/identities";
 
-const LOCAL_API_BASE_URL = "http://localhost:5050";
-const PRODUCTION_API_BASE_URL =
-  "https://the-many-lives-of-one-face.onrender.com";
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ||
-  (import.meta.env.PROD ? PRODUCTION_API_BASE_URL : LOCAL_API_BASE_URL);
+// ==========================================
+// SAFE RUNTIME API BASE URL CONFIGURATION
+// ==========================================
+const RENDER_API_BASE_URL = "https://the-many-lives-of-one-face.onrender.com";
+
+function getApiBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+  if (envUrl && typeof envUrl === "string") {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // Fallback dynamic verification based on the browser's active window location
+  const isLocalhost =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+
+  // If browsing on local computer, target the local server. Otherwise, force Render.
+  return isLocalhost ? "http://localhost:5050" : RENDER_API_BASE_URL;
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Debug context outputs printed natively into browser developer console logs
 console.log("VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
-console.log("API_BASE_URL:", API_BASE_URL);
+console.log("Current Browser Hostname:", window.location.hostname);
+console.log("Resolved API Target URL:", API_BASE_URL);
+
 const BASE_FACE_SRC = "/images/base_face.png";
 
 function fileToDataUrl(file) {
@@ -506,6 +526,13 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {/* Dynamic deployment diagnostics footer */}
+        <footer style={{ marginTop: "2.5rem", padding: "1.5rem 0", borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center", opacity: 0.4, fontSize: "0.85rem" }}>
+          <p className="debug-api-url" style={{ fontFamily: "monospace", letterSpacing: "0.03em" }}>
+            Active Runtime API Target: {API_BASE_URL}
+          </p>
+        </footer>
       </div>
     </main>
   );
