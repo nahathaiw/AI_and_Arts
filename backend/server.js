@@ -48,23 +48,43 @@ const IDENTITY_TITLES = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const allowedOrigins = [
+// Explicitly designated trusted local hosting addresses
+const staticAllowedOrigins = [
   "http://localhost:5173",
-  "http://localhost:3000",
-  process.env.FRONTEND_URL
-].filter(Boolean);
+  "http://localhost:5174",
+  "http://localhost:3000"
+];
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
+      // 1. Allow non-browser, backend-to-backend requests or API client diagnostic checks
+      if (!origin) {
+        return callback(null, true);
       }
-    }
+
+      // 2. Allow explicitly defined local development origins
+      if (staticAllowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // 3. Match absolute environment configurations set inside Render platform options
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL.replace(/\/$/, "")) {
+        return callback(null, true);
+      }
+
+      // 4. DYNAMIC WILD-CARD MATCH: Accept any custom Vercel preview or branch build layout URLs
+      if (origin.startsWith("https://ai-and-arts-") && origin.endsWith(".vercel.app")) {
+        return callback(null, true);
+      }
+
+      // Reject untrusted outside traffic profiles securely
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
   })
 );
+
 app.use(express.json({ limit: "20mb" }));
 
 const ai = new GoogleGenAI({
@@ -359,8 +379,6 @@ function extractGeneratedImage(response) {
 
   return null;
 }
-
-
 
 app.listen(PORT, () => {
   console.log(`Gemini backend running at http://localhost:${PORT}`);
