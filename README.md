@@ -29,45 +29,87 @@ This project explores identity and multiplicity by transforming a single base fa
 - Node.js 16+ and npm
 - Google Gemini API key (free tier available at [ai.google.dev](https://ai.google.dev))
 
-### Installation
+## Running the Project
 
-1. **Install dependencies**
+### Option 1: npm script (easiest)
+```bash
+npm run dev
+```
+This starts both frontend and backend simultaneously using `concurrently`.
+
+**Output you'll see:**
+```
+Frontend: http://localhost:5173
+Backend:  http://localhost:5050
+```
+
+### Option 2: Standalone shell scripts
+
+**macOS/Linux:**
+```bash
+./start-dev.sh
+```
+
+**Windows:**
+```batch
+start-dev.bat
+```
+
+These scripts will:
+- Check for missing dependencies and install them
+- Verify that `backend/.env` exists
+- Start both servers in parallel
+
+### Option 3: Manual (separate terminals)
+
+**Terminal 1 — Backend:**
+```bash
+npm run backend
+```
+
+**Terminal 2 — Frontend:**
+```bash
+npm run frontend
+```
+
+### Option 4: Individual manual setup
+
+**Backend:**
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+**Frontend (new terminal):**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### First-time setup
+
+1. **Install all dependencies:**
    ```bash
    npm install
    npm run install:all
    ```
 
-2. **Set up your Gemini API key**
-   
-   Create `backend/.env`:
+2. **Configure your API key:**
    ```bash
    cp backend/.env.example backend/.env
    ```
-   
-   Then edit `backend/.env`:
-   ```env
-   GEMINI_API_KEY=your_real_gemini_api_key_here
-   PORT=5050
-   GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
-   ```
-   
-   ⚠️ **Never commit `.env` to GitHub**
+   Then edit `backend/.env` and add your real Gemini API key.
 
-3. **Prepare your images**
-   
-   Replace placeholder images with your own:
-   - `frontend/public/images/base_face.png` — Reference face
-   - `frontend/public/images/0[1-8]_*.png` — 8 identity portraits
-   - `backend/base_face.png` — Same reference face for API calls
-
-4. **Run the project**
+3. **Start development servers:**
    ```bash
    npm run dev
    ```
-   
-   Open your browser:
+
+4. **Open your browser:**
    - Frontend: http://localhost:5173
-   - Backend API: http://localhost:5050
+   - Backend: http://localhost:5050 (API only)
 
 ## Project Structure
 
@@ -161,24 +203,7 @@ Replace all placeholder images:
 - `frontend/public/images/01_present_self.png` through `08_business_self.png`
 - `backend/base_face.png` (same as base_face.png)
 
-## Running Commands
 
-```bash
-# Install all dependencies
-npm install && npm run install:all
-
-# Development (both frontend and backend)
-npm run dev
-
-# Frontend only
-npm run dev --prefix frontend
-
-# Backend only
-npm run dev --prefix backend
-
-# Build frontend for production
-npm run build --prefix frontend
-```
 
 ## Troubleshooting
 
