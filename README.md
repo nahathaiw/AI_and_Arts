@@ -304,4 +304,4 @@ This project is for educational purposes. Please respect copyright and obtain pr
 
 - **Concept & Design**: Student Project
 - **AI Technology**: Google Gemini API
-- **Framework**: React + Express
+- **Framework**: React + Express 
