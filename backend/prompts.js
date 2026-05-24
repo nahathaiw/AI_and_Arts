@@ -84,7 +84,7 @@ const dynamicPromptConcepts = {
     "An intense athletic football player portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, expression intensity, stadium lighting, and sports setting.",
 
   gender:
-    "A respectful alternate gender-presentation portrait of the uploaded person. This is the only identity allowed to alter gender presentation. Do not claim or infer actual gender identity. Preserve the underlying face structure, natural complexion, eyes, nose, jawline, and identity marks. Natural, realistic, respectful studio portrait.",
+    "A respectful alternate gender-presentation portrait of the uploaded person. This is the only identity allowed to alter gender presentation. Change only hairstyle, clothing, and styling toward an alternate presentation. Do not change eyes, nose, mouth shape, jawline, skin tone, or face proportions. Do not claim or infer actual gender identity. Natural, realistic, respectful studio portrait.",
 
   artist:
     "A documentary-style creative painter portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, art studio setting, lighting, and creative styling.",
@@ -94,21 +94,20 @@ const dynamicPromptConcepts = {
 };
 
 const dynamicIdentityAnchor = `Use the uploaded reference image as the primary identity anchor.
-Preserve the exact same person from the uploaded reference image.
-Do not replace the face with a new person.
+Generate the same person from the uploaded reference image.
+Do not replace the face with a different person.
 Do not change the core facial structure.
-Do not change the person's visible racial or ethnic appearance.
-Do not change the person's natural complexion.
-Do not change the person's visible gender presentation, except only for the gender identity card.
-Preserve the same recognizable eyes, nose, jawline, facial proportions, hairstyle family, and distinct marks.
-Only transform age, clothing, lighting, setting, mood, and persona.
+Do not change the natural complexion.
+Do not change visible racial or ethnic appearance.
+Do not change visible gender presentation, except only for the gender identity card.
+Preserve the same recognizable eyes, nose, jawline, mouth shape, facial proportions, hairstyle family, and distinct marks.
+Only transform clothing, age, lighting, setting, mood, and persona.
 Photorealistic portrait.
 Natural skin texture.
 No cartoon, no anime, no exaggerated beautification.
-No face replacement.
 No random new person.`;
 
-export function getCompiledPrompt(identityId, customAnalysis = null) {
+export function getCompiledPrompt(identityId, customAnalysis = null, options = {}) {
   const selectedIdentityId = identityPrompts[identityId] ? identityId : "present";
 
   if (!hasValidCustomAnalysis(customAnalysis)) {
@@ -116,7 +115,10 @@ export function getCompiledPrompt(identityId, customAnalysis = null) {
   }
 
   const analysis = sanitizeAnalysis(customAnalysis);
-  const concept = dynamicPromptConcepts[selectedIdentityId];
+  const concept =
+    selectedIdentityId === "gender"
+      ? getGenderTargetConcept(options?.genderOptions?.targetPresentation)
+      : dynamicPromptConcepts[selectedIdentityId];
 
   return `${concept}
 
@@ -129,6 +131,14 @@ Nose: ${analysis.nose}
 Smile / expression: ${analysis.smile}
 Hair: ${analysis.hair}
 Distinct marks: ${analysis.marks}`;
+}
+
+function getGenderTargetConcept(targetPresentation) {
+  if (targetPresentation === "masculine") {
+    return "Create a respectful masculine-presenting alternate portrait of the uploaded person. This is a visual styling transformation, not a statement about the person’s real gender identity. Preserve the same underlying person, same facial identity, same natural complexion, same eyes, same nose, same mouth shape, same jawline structure, same facial proportions, and same identity marks. Do not create a different person. Do not change race, ethnicity, visible ancestry, or natural complexion. Shift only visible styling cues toward a masculine presentation: hairstyle shape, clothing, grooming, pose, and fashion styling. Keep it natural and photorealistic. Avoid exaggerated masculinization or face replacement.";
+  }
+
+  return "Create a respectful feminine-presenting alternate portrait of the uploaded person. This is a visual styling transformation, not a statement about the person’s real gender identity. Preserve the same underlying person, same facial identity, same natural complexion, same eyes, same nose, same mouth shape, same jawline structure, same facial proportions, and same identity marks. Do not create a different person. Do not change race, ethnicity, visible ancestry, or natural complexion. Shift only visible styling cues toward a feminine presentation: hairstyle shape, clothing, grooming, pose softness, and fashion styling. Keep it natural and photorealistic. Avoid exaggerated makeup, beauty-filter effects, or overly idealized features.";
 }
 
 function hasValidCustomAnalysis(customAnalysis) {

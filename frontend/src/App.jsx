@@ -37,6 +37,7 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [customAnalysis, setCustomAnalysis] = useState(null);
   const [uploadedFaceBase64, setUploadedFaceBase64] = useState(null);
+  const [targetPresentation, setTargetPresentation] = useState("feminine");
   const [baseFacePreview, setBaseFacePreview] = useState(BASE_FACE_SRC);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisMessage, setAnalysisMessage] = useState("");
@@ -59,7 +60,9 @@ export default function App() {
       const response = await axios.post(`${API_BASE_URL}/api/generate`, {
         identityId: selectedIdentity.id,
         customAnalysis,
-        referenceImageBase64: uploadedFaceBase64
+        referenceImageBase64: uploadedFaceBase64,
+        genderOptions:
+          selectedIdentity.id === "gender" ? { targetPresentation } : null
       });
       const generatedImage = response.data.imageUrl || response.data.image;
 
@@ -121,6 +124,7 @@ export default function App() {
     try {
       const dataUrl = await fileToDataUrl(file);
       setBaseFacePreview(dataUrl);
+      setUploadedFaceBase64(dataUrl);
 
       const response = await axios.post(`${API_BASE_URL}/api/analyze-face`, {
         imageBase64: dataUrl
@@ -128,7 +132,6 @@ export default function App() {
 
       if (response.data.success && response.data.faceAnalysis) {
         setCustomAnalysis(response.data.faceAnalysis);
-        setUploadedFaceBase64(dataUrl);
         setAnalysisMessage("✓ Dynamic likeness analysis active!");
         setAnalysisError("");
       } else {
@@ -292,6 +295,32 @@ export default function App() {
 
             <p className="panel-copy">{selectedIdentity.description}</p>
 
+            {selectedIdentity.id === "gender" && (
+              <div className="gender-toggle" aria-label="Gender target look">
+                <p className="gender-toggle-label">Target Look:</p>
+                <div className="gender-toggle-buttons">
+                  <button
+                    className={`gender-toggle-button ${
+                      targetPresentation === "masculine" ? "active" : ""
+                    }`}
+                    type="button"
+                    onClick={() => setTargetPresentation("masculine")}
+                  >
+                    Masculine Version
+                  </button>
+                  <button
+                    className={`gender-toggle-button ${
+                      targetPresentation === "feminine" ? "active" : ""
+                    }`}
+                    type="button"
+                    onClick={() => setTargetPresentation("feminine")}
+                  >
+                    Feminine Version
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="portrait-preview">
               {isGenerating && (
                 <div className="portrait-loading" aria-hidden="true">
@@ -313,9 +342,13 @@ export default function App() {
                 className="generate-button"
                 type="button"
                 onClick={handleGenerate}
-                disabled={isGenerating}
+                disabled={isGenerating || isAnalyzing}
               >
-                {isGenerating ? "Generating..." : "Generate"}
+                {isGenerating
+                  ? "Generating..."
+                  : isAnalyzing
+                    ? "Analyzing..."
+                    : "Generate"}
               </button>
               <button
                 className="secondary-button"

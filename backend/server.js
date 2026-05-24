@@ -144,11 +144,12 @@ Rules:
 app.post("/api/generate", async (req, res) => {
   try {
     const {
-      identityId,
+      identityId = "present",
       customAnalysis = null,
       referenceImageBase64 = null,
-      uploadedFaceBase64 = null
-    } = req.body;
+      uploadedFaceBase64 = null,
+      genderOptions = null
+    } = req.body || {};
 
     if (!identityId) {
       return res.status(400).json({
@@ -165,11 +166,19 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    const compiledPrompt = getCompiledPrompt(identityId, customAnalysis);
-    const hasCustomAnalysis = hasMeaningfulCustomAnalysis(customAnalysis);
-    const contents = [{ text: compiledPrompt }];
+    const contents = [];
     const uploadedReferenceImage = parseImageDataUrl(
       referenceImageBase64 || uploadedFaceBase64
+    );
+    const effectiveCustomAnalysis = uploadedReferenceImage
+      ? customAnalysis
+      : null;
+    const compiledPrompt = getCompiledPrompt(
+      identityId,
+      effectiveCustomAnalysis,
+      {
+        genderOptions
+      }
     );
 
     if (uploadedReferenceImage) {
@@ -179,7 +188,7 @@ app.post("/api/generate", async (req, res) => {
           data: uploadedReferenceImage.base64Data
         }
       });
-    } else if (!hasCustomAnalysis) {
+    } else {
       const baseFacePath = path.join(__dirname, "base_face.png");
 
       if (!fs.existsSync(baseFacePath)) {
@@ -200,6 +209,8 @@ app.post("/api/generate", async (req, res) => {
         }
       });
     }
+
+    contents.push({ text: compiledPrompt });
 
     const response = await ai.models.generateContent({
       model: IMAGE_MODEL,
@@ -282,24 +293,6 @@ function validateFaceAnalysis(value) {
 
     return analysis;
   }, {});
-}
-
-function hasMeaningfulCustomAnalysis(customAnalysis) {
-  if (
-    !customAnalysis ||
-    typeof customAnalysis !== "object" ||
-    Array.isArray(customAnalysis)
-  ) {
-    return false;
-  }
-
-  return FACE_ANALYSIS_FIELDS.some((field) => {
-    const value = customAnalysis[field];
-    return (
-      typeof value === "string" &&
-      value.replace(/[{}<>]/g, "").trim().length > 0
-    );
-  });
 }
 
 function getResponseText(response) {
