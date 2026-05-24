@@ -1,0 +1,175 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f7f3ee;
+  color: #222;
+}
+
+.gallery-page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 32px 20px;
+}
+
+.hero {
+  text-align: center;
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 12px;
+  color: #777;
+  margin-bottom: 8px;
+}
+
+.hero h1 {
+  font-size: 44px;
+  margin: 0 0 12px;
+}
+
+.hero p {
+  font-size: 18px;
+  color: #555;
+}
+
+.main-display {
+  display: grid;
+  grid-template-columns: 1fr 1.5fr;
+  gap: 24px;
+  margin-bottom: 32px;
+}
+
+.base-panel,
+.portrait-panel {
+  background: white;
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+}
+
+.base-panel img,
+.portrait-panel img {
+  width: 100%;
+  border-radius: 16px;
+  display: block;
+  object-fit: cover;
+}
+
+.portrait-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+
+.portrait-heading h2 {
+  font-size: 28px;
+  margin: 0 0 12px;
+}
+
+.status-badge {
+  background: #222;
+  color: white;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.portrait-panel p,
+.base-panel p {
+  line-height: 1.6;
+}
+
+.identity-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.identity-card {
+  border: none;
+  background: white;
+  padding: 18px;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: left;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, background 0.2s ease;
+}
+
+.identity-card:hover {
+  transform: translateY(-4px);
+}
+
+.identity-card.selected {
+  background: #222;
+  color: white;
+}
+
+.identity-card h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.generate-button {
+  margin-top: 12px;
+  padding: 12px 18px;
+  border: none;
+  border-radius: 999px;
+  background: #222;
+  color: white;
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.generate-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.loading-image {
+  opacity: 0.45;
+}
+
+.error-message {
+  color: #b00020;
+  font-weight: bold;
+}
+
+.note,
+.small-text {
+  font-size: 13px;
+  color: #666;
+}
+
+.prompt-box {
+  margin-top: 16px;
+  background: #f5f5f5;
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.prompt-box summary {
+  cursor: pointer;
+  font-weight: bold;
+}
+
+@media (max-width: 800px) {
+  .main-display {
+    grid-template-columns: 1fr;
+  }
+
+  .identity-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .hero h1 {
+    font-size: 32px;
+  }
+}
