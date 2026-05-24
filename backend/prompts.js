@@ -2,48 +2,36 @@ export const identityPrompts = {
   present: {
     title: "The Present Self",
     prompt:
-      "Create a centered portrait of the same person as The Present Self. Preserve the same core facial identity. Show a realistic young adult version with natural expression, everyday clothing, clean lighting, and a simple contemporary background. The image should feel authentic and grounded."
+      "A raw, unedited 35mm DSLR headshot portrait of the exact same young East Asian man from the reference image. He has a lean jawline, neat short black hair with textured bangs, and a gentle, natural neutral smile. Shot on a neutral grey background with soft studio portrait lighting, high skin texture detail, completely photorealistic, 8k resolution, documentary photography style."
   },
 
   childhood: {
     title: "The Childhood Self",
     prompt:
-      "Create a centered portrait of the same person as The Childhood Self. Preserve the same core facial identity, but reimagine the person as a child. Show softer facial features, youthful expression, childlike hairstyle, and a warm nostalgic feeling."
+      "A nostalgic, slightly warm-toned vintage analog photograph of the exact same East Asian individual reimagined as a 7-year-old boy. He retains the same eye shape, nose structure, and facial proportions from the reference image. Softer, rounder childhood cheeks, playful youthful expression, wearing a casual t-shirt. Authentic 2000s film texture, soft focus background, realistic film grain."
   },
 
   elderly: {
     title: "The Elderly Self",
     prompt:
-      "Create a centered portrait of the same person as The Elderly Self. Preserve the same core facial identity while showing the person as an older adult with gray hair, gentle wrinkles, and a wise calm expression. Use soft elegant lighting."
+      "A sharp, dignified photographic portrait of the exact same East Asian man from the reference photo, realistically aged to 75 years old. Carefully preserve his core facial bone structure, eye shape, and nose proportions. Add natural, elegant wrinkles around the eyes and brow, realistic age spots, and thinning silver-grey hair. Captured with a 85mm lens, shallow depth of field, dramatic side lighting emphasizing texture, photorealistic human features."
   },
 
   professor: {
     title: "The Professor Self",
     prompt:
-      "Create a centered portrait of the same person as The Professor Self. Preserve the same core facial identity. Show the person as a confident professor wearing professional academic clothing, possibly glasses, in a classroom, office, or library setting."
-  },
-
-  football: {
-    title: "The Football Player Self",
-    prompt:
-      "Create a centered portrait of the same person as The Football Player Self. Preserve the same core facial identity. Show the person as an athlete wearing a football uniform or sportswear, with a confident energetic expression, in a stadium or training field setting."
-  },
-
-  gender: {
-    title: "The Gender-Switched Self",
-    prompt:
-      "Create a centered portrait of the same person as The Gender-Switched Self. Preserve the same core facial identity while reimagining the person with an alternate gender presentation. Adjust hairstyle, clothing, and styling while keeping the image natural and respectful."
+      "A professional editorial portrait photograph of the exact same East Asian man from the reference image, appearing as a university professor in his late 30s. He maintains his distinct jawline, eye shape, and neat black hairstyle, wearing thin silver-rimmed glasses and a tailored tweed blazer. Captured in a softly blurred academic office background with bookshelves. Natural window lighting, photorealistic skin textures, corporate photography style."
   },
 
   artist: {
     title: "The Artist Self",
     prompt:
-      "Create a centered portrait of the same person as The Artist Self. Preserve the same core facial identity. Show the person as a creative artist in a studio environment with sketchbooks, paint, canvases, or artistic tools. The image should feel expressive and imaginative."
+      "A cinematic, documentary-style photograph of the exact same East Asian man from the reference image working as a creative painter. He has his distinct facial features and black hair, dressed in a casual charcoal work shirt with subtle paint splatters. Shot inside a bright, naturally lit sunlit art studio with canvas stands out of focus behind him. Realistic lighting, crisp details, authentic human appearance."
   },
 
   business: {
     title: "The Business Self",
     prompt:
-      "Create a centered portrait of the same person as The Business Self. Preserve the same core facial identity. Show the person as a confident business professional wearing formal office attire in a modern office setting. The image should communicate ambition and leadership."
+      "A sleek corporate headshot photograph of the exact same East Asian man from the reference image as a successful executive. Clear preservation of his core facial identity, jawline, and features. Clean-cut, styled black hair, wearing a sharp dark navy business suit with a white collar shirt. Professional studio lighting, crisp focus, clear skin textures, looking directly into the camera confidently."
   }
 };
