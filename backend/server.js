@@ -360,6 +360,13 @@ function extractGeneratedImage(response) {
   return null;
 }
 
+app.get("/api/health", (req, res) => {
+  res.json({
+    success: true,
+    message: "Backend is running",
+  });
+});
+
 app.listen(PORT, () => {
   console.log(`Gemini backend running at http://localhost:${PORT}`);
 });
