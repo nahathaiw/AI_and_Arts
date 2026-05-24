@@ -48,7 +48,23 @@ const IDENTITY_TITLES = {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(cors());
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    }
+  })
+);
 app.use(express.json({ limit: "20mb" }));
 
 const ai = new GoogleGenAI({
@@ -59,6 +75,10 @@ app.get("/", (req, res) => {
   res.json({
     message: "Many Lives of One Face Gemini backend is running."
   });
+});
+
+app.get("/api/health", (req, res) => {
+  res.json({ success: true, message: "Backend is running" });
 });
 
 app.post("/api/analyze-face", async (req, res) => {

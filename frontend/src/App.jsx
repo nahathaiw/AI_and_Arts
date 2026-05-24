@@ -2,7 +2,8 @@ import { useState } from "react";
 import axios from "axios";
 import { identities } from "./data/identities";
 
-const API_BASE_URL = "http://localhost:5050";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "http://localhost:5050";
 const BASE_FACE_SRC = "/images/base_face.png";
 
 function fileToDataUrl(file) {
