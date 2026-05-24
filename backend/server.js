@@ -6,7 +6,7 @@ import path from "path";
 // 1. Swap OpenAI import for the official Google Gen AI SDK
 import { GoogleGenAI } from "@google/genai";
 import { fileURLToPath } from "url";
-import { identityPrompts } from "./prompts.js";
+import { getCompiledPrompt, identityPrompts, sanitizeAnalysis } from "./prompts.js";
 
 dotenv.config();
 
@@ -98,19 +98,89 @@ function getReferenceImage(customAnalysis) {
   return getDefaultReferenceImage();
 }
 
+function extractResponseText(response) {
+  if (typeof response?.text === "string") {
+    return response.text;
+  }
+
+  return (response?.candidates?.[0]?.content?.parts || [])
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+}
+
+function parseJsonResponse(text) {
+  const cleanedText = text
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/i, "")
+    .trim();
+
+  const firstBraceIndex = cleanedText.indexOf("{");
+  const lastBraceIndex = cleanedText.lastIndexOf("}");
+
+  if (firstBraceIndex === -1 || lastBraceIndex === -1) {
+    throw new Error("Face analysis did not return JSON.");
+  }
+
+  return JSON.parse(cleanedText.slice(firstBraceIndex, lastBraceIndex + 1));
+}
+
 app.get("/", (req, res) => {
   res.json({
     message: "Many Lives of One Face Gemini backend is running."
   });
 });
 
-app.post("/api/analyze-face", (req, res) => {
+app.post("/api/analyze-face", async (req, res) => {
   try {
     const referenceImage = parseImageDataUrl(req.body.imageBase64);
+
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        success: false,
+        error: "Missing GEMINI_API_KEY. Face analysis requires Gemini."
+      });
+    }
+
+    const analysisPrompt = [
+      "Analyze the attached portrait image and return only raw JSON with exactly these string fields:",
+      "jawline, eyes, nose, smile, hair, skinTone, presentation, marks.",
+      "Describe only visible, image-grounded facial and styling details useful for preserving likeness in a respectful portrait transformation.",
+      "For presentation, describe only visible styling presentation using terms like masculine, feminine, androgynous, neutral, or not clearly visible.",
+      "Do not infer or mention actual gender identity, race, ethnicity, nationality, ancestry, religion, sexuality, age, health, personality, or socioeconomic status.",
+      "If a field is unclear, use a short phrase such as \"not clearly visible\"."
+    ].join("\n");
+
+    const response = await ai.models.generateContent({
+      model: process.env.GEMINI_ANALYSIS_MODEL || "gemini-2.5-flash",
+      contents: [
+        { text: analysisPrompt },
+        {
+          inlineData: {
+            mimeType: referenceImage.mimeType,
+            data: referenceImage.data
+          }
+        }
+      ],
+      config: {
+        responseMimeType: "application/json",
+        systemInstruction: [
+          "You are a cautious facial-feature extraction assistant for an AI art workflow.",
+          "Return only raw JSON. No markdown, no commentary, no extra keys.",
+          "Extract only visible non-sensitive features.",
+          "The presentation field must only describe visible styling, never actual gender identity.",
+          "Never infer race, ethnicity, nationality, ancestry, or other protected identity traits."
+        ].join("\n")
+      }
+    });
+
+    const parsedAnalysis = parseJsonResponse(extractResponseText(response));
+    const safeAnalysis = sanitizeAnalysis(parsedAnalysis);
 
     res.json({
       success: true,
       faceAnalysis: {
+        ...safeAnalysis,
         imageBase64: referenceImage.imageBase64,
         mimeType: referenceImage.mimeType,
         source: "upload"
@@ -165,22 +235,18 @@ app.post("/api/generate", async (req, res) => {
     }
 
     // 2. Build the instruction prompt
-    const finalPrompt = `
-      You are an artistic AI collaborator. Create a polished, high-quality digital art portrait based on this concept:
-      
-      "${selectedIdentity.prompt}"
-      
-      Visual reference instructions:
-      - Use the attached face image as the visual reference to guide the core facial bone structure, proportions, and identity.
-      - If the concept prompt describes demographic details, hair, marks, or facial features that conflict with the attached image, treat the attached image as the source of truth.
-      - Transform the medium, clothing, background, and expression to fully match the concept.
-      - Ensure the composition remains a centered portrait suitable for a unified art gallery series.
-    `;
-
-    // 3. Initialize the Google Gen AI SDK client
-    const ai = new GoogleGenAI({
-      apiKey: process.env.GEMINI_API_KEY
-    });
+    const compiledPrompt = getCompiledPrompt(identityId, customAnalysis);
+    const finalPrompt = [
+      "You are an artistic AI collaborator. Create a polished, high-quality digital art portrait based on this compiled concept prompt:",
+      "",
+      compiledPrompt,
+      "",
+      "Visual reference instructions:",
+      "- Use the attached face image as the visual reference to guide the core facial bone structure, proportions, and identity.",
+      "- If the concept prompt describes demographic details, hair, marks, or facial features that conflict with the attached image, treat the attached image as the source of truth.",
+      "- Transform the medium, clothing, background, lighting, and expression to fully match the concept.",
+      "- Ensure the composition remains a centered portrait suitable for a unified art gallery series."
+    ].join("\n");
 
     // 4. Use generateContent with IMAGE response modalities
     const response = await ai.models.generateContent({

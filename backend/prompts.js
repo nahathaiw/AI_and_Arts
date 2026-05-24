@@ -48,3 +48,103 @@ export const identityPrompts = {
       "A premium, professional corporate headshot photograph of the exact same East Asian man from the reference photo, appearing as a confident young business executive. Meticulously preserve his facial identity, his double eyelids, his neat black hair with textured bangs, and the small mole on his lower right cheek. He is wearing a custom-tailored dark navy business suit with a crisp white shirt. Shot inside a modern office with floor-to-ceiling windows showing a softly blurred city skyline. Sharp, professional studio lighting, realistic and high-resolution skin details."
   }
 };
+
+export const identityConcepts = {
+  present: "raw realistic present-day studio portrait",
+  childhood: "nostalgic late-1990s childhood family album portrait",
+  elderly: "dignified elderly close-up portrait with realistic aging",
+  professor: "late-30s university professor editorial portrait",
+  football: "professional football player dramatic sports portrait",
+  gender: "alternate visible gender presentation studio portrait",
+  artist: "independent creative painter documentary studio portrait",
+  business: "young business executive professional corporate portrait"
+};
+
+const ANALYSIS_FIELDS = [
+  "jawline",
+  "eyes",
+  "nose",
+  "smile",
+  "hair",
+  "skinTone",
+  "presentation",
+  "marks"
+];
+
+const ANALYSIS_FALLBACKS = {
+  jawline: "not clearly visible",
+  eyes: "not clearly visible",
+  nose: "not clearly visible",
+  smile: "not clearly visible",
+  hair: "not clearly visible",
+  skinTone: "natural visible skin tone from the reference image",
+  presentation: "neutral visible presentation",
+  marks: "no clearly visible distinguishing marks"
+};
+
+function cleanAnalysisValue(value) {
+  if (typeof value !== "string") {
+    return "";
+  }
+
+  return value
+    .replace(/[{}<>]/g, "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 240)
+    .trim();
+}
+
+export function hasValidCustomAnalysis(customAnalysis) {
+  if (!customAnalysis || typeof customAnalysis !== "object") {
+    return false;
+  }
+
+  return ANALYSIS_FIELDS.some((field) => cleanAnalysisValue(customAnalysis[field]).length > 0);
+}
+
+export function sanitizeAnalysis(customAnalysis = {}) {
+  return ANALYSIS_FIELDS.reduce((analysis, field) => {
+    const sanitizedValue = cleanAnalysisValue(customAnalysis[field]);
+
+    analysis[field] = sanitizedValue || ANALYSIS_FALLBACKS[field];
+
+    return analysis;
+  }, {});
+}
+
+export function getCompiledPrompt(identityId, customAnalysis) {
+  const selectedIdentity = identityPrompts[identityId];
+
+  if (!selectedIdentity) {
+    return "";
+  }
+
+  if (!hasValidCustomAnalysis(customAnalysis)) {
+    return selectedIdentity.prompt;
+  }
+
+  const concept = identityConcepts[identityId] || selectedIdentity.title;
+  const analysis = sanitizeAnalysis(customAnalysis);
+
+  return [
+    `Create a polished, high-quality photographic portrait for the AI art project "The Many Lives of One Face."`,
+    `Identity concept: ${concept}.`,
+    "Use the attached face image as the visual source of truth and preserve the same person's visible facial identity.",
+    "User-provided visible feature analysis to preserve:",
+    `- Jawline / face shape: ${analysis.jawline}`,
+    `- Eyes: ${analysis.eyes}`,
+    `- Nose: ${analysis.nose}`,
+    `- Smile / mouth: ${analysis.smile}`,
+    `- Hair: ${analysis.hair}`,
+    `- Visible skin tone and texture: ${analysis.skinTone}`,
+    `- Visible styling presentation only: ${analysis.presentation}`,
+    `- Distinguishing visible marks: ${analysis.marks}`,
+    "Safety and representation rules:",
+    "- The presentation field describes only visible styling such as masculine, feminine, androgynous, neutral, or not clearly visible.",
+    "- Never infer or state actual gender identity, race, ethnicity, nationality, ancestry, or other protected identity traits from the image.",
+    "- If a requested concept conflicts with the uploaded face, preserve the uploaded face and only transform clothing, setting, age styling, lighting, expression, and art direction.",
+    "- Keep the result respectful, natural, photorealistic, centered as a portrait, and consistent with a unified gallery series."
+  ].join("\n");
+}
