@@ -2,8 +2,12 @@ import { useState } from "react";
 import axios from "axios";
 import { identities } from "./data/identities";
 
+const LOCAL_API_BASE_URL = "http://localhost:5050";
+const PRODUCTION_API_BASE_URL =
+  "https://the-many-lives-of-one-face.onrender.com";
 const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || "http://localhost:5050";
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? PRODUCTION_API_BASE_URL : LOCAL_API_BASE_URL);
 console.log("VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
 console.log("API_BASE_URL:", API_BASE_URL);
 const BASE_FACE_SRC = "/images/base_face.png";
