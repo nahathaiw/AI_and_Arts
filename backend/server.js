@@ -58,27 +58,28 @@ const staticAllowedOrigins = [
 app.use(
   cors({
     origin(origin, callback) {
-      // 1. Allow non-browser, backend-to-backend requests or API client diagnostic checks
+      // 1. Allow non-browser requests or health check pings
       if (!origin) {
         return callback(null, true);
       }
 
-      // 2. Allow explicitly defined local development origins
+      // 2. Allow local engineering development addresses
       if (staticAllowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      // 3. Match absolute environment configurations set inside Render platform options
+      // 3. Match absolute environment dashboard configurations
       if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL.replace(/\/$/, "")) {
         return callback(null, true);
       }
 
-      // 4. DYNAMIC WILD-CARD MATCH: Accept any custom Vercel preview or branch build layout URLs
-      if (origin.startsWith("https://ai-and-arts-") && origin.endsWith(".vercel.app")) {
+      // 4. BULLETPROOF REGEX MATCH: Matches any vercel.app subdomain that contains "ai-and-arts"
+      const isVercelSubdomain = /^https:\/\/ai-and-arts-.*\.vercel\.app$/.test(origin);
+      if (isVercelSubdomain) {
         return callback(null, true);
       }
 
-      // Reject untrusted outside traffic profiles securely
+      // Secure rejection fallback
       return callback(new Error("Not allowed by CORS"));
     },
     credentials: true
