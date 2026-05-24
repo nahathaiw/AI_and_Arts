@@ -36,6 +36,7 @@ export default function App() {
   const [savedHistory, setSavedHistory] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [customAnalysis, setCustomAnalysis] = useState(null);
+  const [uploadedFaceBase64, setUploadedFaceBase64] = useState(null);
   const [baseFacePreview, setBaseFacePreview] = useState(BASE_FACE_SRC);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisMessage, setAnalysisMessage] = useState("");
@@ -57,7 +58,8 @@ export default function App() {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/generate`, {
         identityId: selectedIdentity.id,
-        customAnalysis
+        customAnalysis,
+        referenceImageBase64: uploadedFaceBase64
       });
       const generatedImage = response.data.imageUrl || response.data.image;
 
@@ -98,6 +100,7 @@ export default function App() {
 
     if (!["image/png", "image/jpeg"].includes(file.type)) {
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
       setAnalysisError("Please upload a PNG or JPEG image.");
       input.value = "";
@@ -106,6 +109,7 @@ export default function App() {
 
     if (file.size > 8 * 1024 * 1024) {
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
       setAnalysisError("Please upload an image smaller than 8MB.");
       input.value = "";
@@ -124,7 +128,9 @@ export default function App() {
 
       if (response.data.success && response.data.faceAnalysis) {
         setCustomAnalysis(response.data.faceAnalysis);
+        setUploadedFaceBase64(dataUrl);
         setAnalysisMessage("✓ Dynamic likeness analysis active!");
+        setAnalysisError("");
       } else {
         throw new Error(
           response.data.error || "Face analysis did not return usable data."
@@ -133,6 +139,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
       setAnalysisError(
         "Could not analyze this image. Using default face instead."

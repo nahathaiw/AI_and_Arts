@@ -48,3 +48,121 @@ export const identityPrompts = {
       "A premium, professional corporate headshot photograph of the exact same East Asian man from the reference photo, appearing as a confident young business executive. Meticulously preserve his facial identity, his double eyelids, his neat black hair with textured bangs, and the small mole on his lower right cheek. He is wearing a custom-tailored dark navy business suit with a crisp white shirt. Shot inside a modern office with floor-to-ceiling windows showing a softly blurred city skyline. Sharp, professional studio lighting, realistic and high-resolution skin details."
   }
 };
+
+const analysisFields = [
+  "jawline",
+  "eyes",
+  "nose",
+  "smile",
+  "hair",
+  "marks"
+];
+
+const analysisFallbacks = {
+  jawline: "natural visible face shape",
+  eyes: "natural visible eye shape",
+  nose: "natural visible nose shape",
+  smile: "natural visible expression",
+  hair: "natural visible hairstyle",
+  marks: "no clearly visible distinct marks"
+};
+
+const dynamicPromptConcepts = {
+  present:
+    "A raw, unedited, high-resolution DSLR studio headshot of the uploaded person as their present self. Preserve the exact same face, same identity, same visible presentation, same natural complexion, and same facial structure. Neutral studio background, soft professional diffused lighting, natural skin texture.",
+
+  childhood:
+    "A nostalgic warm-toned childhood portrait of the uploaded person reimagined as a child version of the same person. Preserve recognizable identity cues from the uploaded face. Do not recast the person as a different child. Keep the same visible ancestry/complexion and facial identity. Only make age-related changes such as softer cheeks and younger proportions. Warm family album feeling, natural film grain.",
+
+  elderly:
+    "A realistic elderly portrait of the uploaded person. Preserve the same skull proportions, eyes, nose, face shape, natural complexion, and distinct marks. Only add natural aging details such as wrinkles, mature facial texture, and aged hair. Elegant studio portrait lighting.",
+
+  professor:
+    "A professional university professor portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, glasses if appropriate, lighting, and academic office setting.",
+
+  football:
+    "An intense athletic football player portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, expression intensity, stadium lighting, and sports setting.",
+
+  gender:
+    "A respectful alternate gender-presentation portrait of the uploaded person. This is the only identity allowed to alter gender presentation. Do not claim or infer actual gender identity. Preserve the underlying face structure, natural complexion, eyes, nose, jawline, and identity marks. Natural, realistic, respectful studio portrait.",
+
+  artist:
+    "A documentary-style creative painter portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, art studio setting, lighting, and creative styling.",
+
+  business:
+    "A premium corporate portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change suit/clothing, office setting, and lighting."
+};
+
+const dynamicIdentityAnchor = `Use the uploaded reference image as the primary identity anchor.
+Preserve the exact same person from the uploaded reference image.
+Do not replace the face with a new person.
+Do not change the core facial structure.
+Do not change the person's visible racial or ethnic appearance.
+Do not change the person's natural complexion.
+Do not change the person's visible gender presentation, except only for the gender identity card.
+Preserve the same recognizable eyes, nose, jawline, facial proportions, hairstyle family, and distinct marks.
+Only transform age, clothing, lighting, setting, mood, and persona.
+Photorealistic portrait.
+Natural skin texture.
+No cartoon, no anime, no exaggerated beautification.
+No face replacement.
+No random new person.`;
+
+export function getCompiledPrompt(identityId, customAnalysis = null) {
+  const selectedIdentityId = identityPrompts[identityId] ? identityId : "present";
+
+  if (!hasValidCustomAnalysis(customAnalysis)) {
+    return identityPrompts[selectedIdentityId].prompt;
+  }
+
+  const analysis = sanitizeAnalysis(customAnalysis);
+  const concept = dynamicPromptConcepts[selectedIdentityId];
+
+  return `${concept}
+
+${dynamicIdentityAnchor}
+
+Uploaded face analysis:
+Jawline / face shape: ${analysis.jawline}
+Eyes: ${analysis.eyes}
+Nose: ${analysis.nose}
+Smile / expression: ${analysis.smile}
+Hair: ${analysis.hair}
+Distinct marks: ${analysis.marks}`;
+}
+
+function hasValidCustomAnalysis(customAnalysis) {
+  if (
+    !customAnalysis ||
+    typeof customAnalysis !== "object" ||
+    Array.isArray(customAnalysis)
+  ) {
+    return false;
+  }
+
+  return analysisFields.some((field) => {
+    const value = customAnalysis[field];
+
+    if (typeof value !== "string") {
+      return false;
+    }
+
+    return sanitizeAnalysisValue(value).length > 0;
+  });
+}
+
+function sanitizeAnalysis(customAnalysis) {
+  return analysisFields.reduce((analysis, field) => {
+    const value = customAnalysis[field];
+    const sanitizedValue =
+      typeof value === "string" ? sanitizeAnalysisValue(value) : "";
+
+    analysis[field] = sanitizedValue || analysisFallbacks[field];
+
+    return analysis;
+  }, {});
+}
+
+function sanitizeAnalysisValue(value) {
+  return value.replace(/[{}<>]/g, "").trim().slice(0, 240);
+}
