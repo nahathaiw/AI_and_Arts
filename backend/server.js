@@ -12,6 +12,12 @@ dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5050;
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
+const SUPPORTED_IMAGE_MIME_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp"
+]);
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -25,15 +31,102 @@ const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
 
+function getBase64Size(base64Data) {
+  const normalizedData = base64Data.replace(/\s/g, "");
+  const padding = normalizedData.endsWith("==")
+    ? 2
+    : normalizedData.endsWith("=")
+      ? 1
+      : 0;
+
+  return Math.floor((normalizedData.length * 3) / 4) - padding;
+}
+
+function parseImageDataUrl(imageDataUrl) {
+  if (typeof imageDataUrl !== "string") {
+    throw new Error("Missing uploaded image.");
+  }
+
+  const match = imageDataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([a-zA-Z0-9+/=\s]+)$/);
+
+  if (!match) {
+    throw new Error("Upload must be a PNG, JPEG, or WebP data URL.");
+  }
+
+  const [, mimeType, rawBase64Data] = match;
+  const data = rawBase64Data.replace(/\s/g, "");
+
+  if (!SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
+    throw new Error("Unsupported image type.");
+  }
+
+  if (getBase64Size(data) > MAX_UPLOAD_BYTES) {
+    throw new Error("Uploaded image is larger than 8MB.");
+  }
+
+  return {
+    mimeType,
+    data,
+    imageBase64: `data:${mimeType};base64,${data}`
+  };
+}
+
+function getDefaultReferenceImage() {
+  const baseFacePath = path.join(__dirname, "base_face.png");
+
+  if (!fs.existsSync(baseFacePath)) {
+    throw new Error("Base face image not found in backend folder.");
+  }
+
+  const imageBuffer = fs.readFileSync(baseFacePath);
+
+  return {
+    mimeType: "image/png",
+    data: imageBuffer.toString("base64"),
+    source: "default"
+  };
+}
+
+function getReferenceImage(customAnalysis) {
+  if (customAnalysis?.imageBase64) {
+    return {
+      ...parseImageDataUrl(customAnalysis.imageBase64),
+      source: "upload"
+    };
+  }
+
+  return getDefaultReferenceImage();
+}
+
 app.get("/", (req, res) => {
   res.json({
     message: "Many Lives of One Face Gemini backend is running."
   });
 });
 
+app.post("/api/analyze-face", (req, res) => {
+  try {
+    const referenceImage = parseImageDataUrl(req.body.imageBase64);
+
+    res.json({
+      success: true,
+      faceAnalysis: {
+        imageBase64: referenceImage.imageBase64,
+        mimeType: referenceImage.mimeType,
+        source: "upload"
+      }
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      error: error.message || "Could not read uploaded image."
+    });
+  }
+});
+
 app.post("/api/generate", async (req, res) => {
   try {
-    const { identityId } = req.body;
+    const { identityId, customAnalysis } = req.body;
 
     if (!identityId) {
       return res.status(400).json({
@@ -59,19 +152,17 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    const baseFacePath = path.join(__dirname, "base_face.png");
+    let referenceImage;
 
-    if (!fs.existsSync(baseFacePath)) {
+    try {
+      referenceImage = getReferenceImage(customAnalysis);
+    } catch (error) {
       return res.status(500).json({
         success: false,
         fallback: true,
-        error: "Base face image not found in backend folder."
+        error: error.message || "Could not load the reference face image."
       });
     }
-
-    // 1. Read the base face image file and extract raw base64 data
-    const imageBuffer = fs.readFileSync(baseFacePath);
-    const base64Image = imageBuffer.toString("base64");
 
     // 2. Build the instruction prompt
     const finalPrompt = `
@@ -81,6 +172,7 @@ app.post("/api/generate", async (req, res) => {
       
       Visual reference instructions:
       - Use the attached face image as the visual reference to guide the core facial bone structure, proportions, and identity.
+      - If the concept prompt describes demographic details, hair, marks, or facial features that conflict with the attached image, treat the attached image as the source of truth.
       - Transform the medium, clothing, background, and expression to fully match the concept.
       - Ensure the composition remains a centered portrait suitable for a unified art gallery series.
     `;
@@ -97,8 +189,8 @@ app.post("/api/generate", async (req, res) => {
         { text: finalPrompt },
         {
           inlineData: {
-            mimeType: "image/png",
-            data: base64Image
+            mimeType: referenceImage.mimeType,
+            data: referenceImage.data
           }
         }
       ],
@@ -127,6 +219,7 @@ app.post("/api/generate", async (req, res) => {
       success: true,
       provider: "gemini",
       model: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
+      referenceSource: referenceImage.source,
       title: selectedIdentity.title,
       promptUsed: finalPrompt,
       image: `data:${mimeType};base64,${imageBase64}`

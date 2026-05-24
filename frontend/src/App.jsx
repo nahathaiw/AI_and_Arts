@@ -4,6 +4,7 @@ import { identities } from "./data/identities";
 
 const API_BASE_URL = "http://localhost:5050";
 const BASE_FACE_SRC = "/images/base_face.png";
+const SUPPORTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -96,10 +97,10 @@ export default function App() {
     setAnalysisMessage("");
     setAnalysisError("");
 
-    if (!["image/png", "image/jpeg"].includes(file.type)) {
+    if (!SUPPORTED_UPLOAD_TYPES.includes(file.type)) {
       setCustomAnalysis(null);
       setBaseFacePreview(BASE_FACE_SRC);
-      setAnalysisError("Please upload a PNG or JPEG image.");
+      setAnalysisError("Please upload a PNG, JPEG, or WebP image.");
       input.value = "";
       return;
     }
@@ -124,7 +125,7 @@ export default function App() {
 
       if (response.data.success && response.data.faceAnalysis) {
         setCustomAnalysis(response.data.faceAnalysis);
-        setAnalysisMessage("✓ Dynamic likeness analysis active!");
+        setAnalysisMessage("✓ Uploaded face reference active!");
       } else {
         throw new Error(
           response.data.error || "Face analysis did not return usable data."
@@ -245,7 +246,7 @@ export default function App() {
                 id="face-upload"
                 className="upload-input"
                 type="file"
-                accept="image/png, image/jpeg"
+                accept={SUPPORTED_UPLOAD_TYPES.join(", ")}
                 onChange={handleFaceUpload}
                 disabled={isAnalyzing}
               />
