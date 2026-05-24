@@ -5,6 +5,26 @@ import { identities } from "./data/identities";
 const API_BASE_URL = "http://localhost:5050";
 const BASE_FACE_SRC = "/images/base_face.png";
 
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        resolve(reader.result);
+      } else {
+        reject(new Error("Could not read uploaded image."));
+      }
+    };
+
+    reader.onerror = () => {
+      reject(reader.error || new Error("Could not read uploaded image."));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 export default function App() {
   const [selectedIdentity, setSelectedIdentity] = useState(identities[0]);
   const [displayImage, setDisplayImage] = useState(identities[0].image);
@@ -15,6 +35,11 @@ export default function App() {
   const [compareView, setCompareView] = useState(false);
   const [savedHistory, setSavedHistory] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+  const [customAnalysis, setCustomAnalysis] = useState(null);
+  const [baseFacePreview, setBaseFacePreview] = useState(BASE_FACE_SRC);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [analysisMessage, setAnalysisMessage] = useState("");
+  const [analysisError, setAnalysisError] = useState("");
 
   function handleSelectIdentity(identity) {
     setSelectedIdentity(identity);
@@ -31,11 +56,13 @@ export default function App() {
 
     try {
       const response = await axios.post(`${API_BASE_URL}/api/generate`, {
-        identityId: selectedIdentity.id
+        identityId: selectedIdentity.id,
+        customAnalysis
       });
+      const generatedImage = response.data.imageUrl || response.data.image;
 
-      if (response.data.success && response.data.image) {
-        setDisplayImage(response.data.image);
+      if (response.data.success && generatedImage) {
+        setDisplayImage(generatedImage);
         setPromptUsed(response.data.promptUsed || "");
         setDisplaySource("api");
       } else {
@@ -43,7 +70,7 @@ export default function App() {
         setDisplaySource("curated");
         setErrorMessage(
           response.data.error ||
-            "Live generation failed. Showing curated version instead."
+            "Live generation is unavailable. Showing the curated portrait instead."
         );
       }
     } catch (error) {
@@ -51,10 +78,68 @@ export default function App() {
       setDisplayImage(selectedIdentity.image);
       setDisplaySource("curated");
       setErrorMessage(
-        "Live generation failed. Showing curated version instead."
+        "Live generation is unavailable. Showing the curated portrait instead."
       );
     } finally {
       setIsGenerating(false);
+    }
+  }
+
+  async function handleFaceUpload(event) {
+    const input = event.target;
+    const file = input.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    setAnalysisMessage("");
+    setAnalysisError("");
+
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
+      setCustomAnalysis(null);
+      setBaseFacePreview(BASE_FACE_SRC);
+      setAnalysisError("Please upload a PNG or JPEG image.");
+      input.value = "";
+      return;
+    }
+
+    if (file.size > 8 * 1024 * 1024) {
+      setCustomAnalysis(null);
+      setBaseFacePreview(BASE_FACE_SRC);
+      setAnalysisError("Please upload an image smaller than 8MB.");
+      input.value = "";
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      const dataUrl = await fileToDataUrl(file);
+      setBaseFacePreview(dataUrl);
+
+      const response = await axios.post(`${API_BASE_URL}/api/analyze-face`, {
+        imageBase64: dataUrl
+      });
+
+      if (response.data.success && response.data.faceAnalysis) {
+        setCustomAnalysis(response.data.faceAnalysis);
+        setAnalysisMessage("✓ Dynamic likeness analysis active!");
+      } else {
+        throw new Error(
+          response.data.error || "Face analysis did not return usable data."
+        );
+      }
+    } catch (error) {
+      console.error(error);
+      setCustomAnalysis(null);
+      setBaseFacePreview(BASE_FACE_SRC);
+      setAnalysisError(
+        "Could not analyze this image. Using default face instead."
+      );
+    } finally {
+      setIsAnalyzing(false);
+      input.value = "";
     }
   }
 
@@ -75,6 +160,7 @@ export default function App() {
     };
 
     setSavedHistory((prev) => [historyItem, ...prev]);
+    setIsHistoryOpen(true);
   }
 
   function handleDeleteHistory(itemId) {
@@ -89,7 +175,6 @@ export default function App() {
       let downloadUrl = displayImage;
       let revokeUrl = null;
 
-      // Supports both data URLs and local asset paths.
       if (!displayImage.startsWith("data:")) {
         const response = await fetch(displayImage);
         if (!response.ok) {
@@ -119,269 +204,262 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-neutral-100">
-      <div className="mx-auto max-w-6xl px-6 py-10">
-        <header className="mb-10 space-y-3">
-          <p className="text-sm uppercase tracking-[0.35em] text-neutral-500">
-            AI + Art Final Project · 楊妤安 111006211
-          </p>
-          <h1 className="text-4xl font-semibold tracking-tight text-neutral-50 md:text-5xl">
-            The Many Lives of One Face
-          </h1>
-          <p className="max-w-2xl text-sm leading-relaxed text-neutral-400">
-            A curated AI portrait gallery with a live Gemini transformation
-            engine. Explore eight identities, compare the base anchor, and save
-            the lives that resonate with you.
+    <main className="app-shell">
+      <div className="app-container">
+        <header className="hero">
+          <p className="project-label">AI + Art Final Project · 楊妤安 111006211</p>
+          <h1>The Many Lives of One Face</h1>
+          <p>
+            A dark AI portrait gallery exploring how one face can move through
+            age, memory, gender, work, ambition, and imagined selves.
           </p>
         </header>
 
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="space-y-8">
-            <div className="rounded-3xl border border-neutral-800 bg-neutral-900/40 p-6 shadow-[0_0_60px_-30px_rgba(16,185,129,0.45)]">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-                    Selected Identity
-                  </p>
-                  <h2 className="text-2xl font-semibold text-neutral-50">
-                    {selectedIdentity.title}
-                  </h2>
-                  <p className="mt-1 text-sm text-neutral-400">
-                    {selectedIdentity.description}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 rounded-full border border-neutral-800 bg-neutral-900/60 px-4 py-2 text-xs text-neutral-300">
-                  <span
-                    className={`h-2 w-2 rounded-full ${
-                      isGenerating ? "bg-emerald-400" : "bg-neutral-500"
-                    }`}
-                  />
-                  {isGenerating ? "Generating" : "Ready"}
-                </div>
+        <section className="gallery-layout" aria-label="Portrait gallery">
+          <aside className="panel base-panel">
+            <div className="panel-header">
+              <div>
+                <p className="section-label">Base Face</p>
+                <h2>Present Self</h2>
               </div>
-
-              <div className="mt-6 space-y-4">
-                <div
-                  className={`overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60 transition-all duration-300 ${
-                    compareView
-                      ? "grid gap-4 p-4 md:grid-cols-2"
-                      : "p-6"
-                  }`}
-                >
-                  {compareView ? (
-                    <>
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-                          Base Anchor
-                        </p>
-                        <img
-                          src={BASE_FACE_SRC}
-                          alt="Base anchor"
-                          className="aspect-[4/5] w-full rounded-xl border border-neutral-800 object-cover grayscale"
-                          onError={handleImageError}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-                          Mutated Self
-                        </p>
-                        <img
-                          src={displayImage}
-                          alt={selectedIdentity.title}
-                          className={`aspect-[4/5] w-full rounded-xl border border-neutral-800 object-cover transition ${
-                            isGenerating ? "animate-pulse opacity-70" : ""
-                          }`}
-                          onError={handleImageError}
-                        />
-                      </div>
-                    </>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between text-xs uppercase tracking-[0.3em] text-neutral-500">
-                        <span>Mutated Self</span>
-                        <span className="rounded-full border border-neutral-800 bg-neutral-900/70 px-3 py-1 text-[10px] text-neutral-300">
-                          {displaySource === "api" ? "API Gen" : "Curated"}
-                        </span>
-                      </div>
-                      <img
-                        src={displayImage}
-                        alt={selectedIdentity.title}
-                        className={`aspect-[4/5] w-full rounded-xl border border-neutral-800 object-cover transition ${
-                          isGenerating ? "animate-pulse opacity-70" : ""
-                        }`}
-                        onError={handleImageError}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {errorMessage && (
-                  <div className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">
-                    {errorMessage}
-                  </div>
-                )}
-
-                <div className="flex flex-wrap gap-3">
-                  <button
-                    className="rounded-full border border-emerald-500/40 bg-emerald-500/20 px-5 py-2 text-sm font-medium text-emerald-100 transition hover:border-emerald-400 hover:bg-emerald-500/30 disabled:cursor-not-allowed disabled:opacity-40"
-                    onClick={handleGenerate}
-                    disabled={isGenerating}
-                  >
-                    {isGenerating ? "Generating..." : "Generate New Version"}
-                  </button>
-                  <button
-                    className="rounded-full border border-neutral-700 bg-neutral-900/60 px-5 py-2 text-sm text-neutral-200 transition hover:border-neutral-500 hover:text-neutral-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    onClick={handleDownload}
-                    disabled={isGenerating}
-                  >
-                    Download Portrait
-                  </button>
-                  <button
-                    className="rounded-full border border-neutral-700 bg-neutral-900/60 px-5 py-2 text-sm text-neutral-200 transition hover:border-neutral-500 hover:text-neutral-100"
-                    onClick={handleSaveToHistory}
-                  >
-                    Save to History
-                  </button>
-                  <button
-                    className={`rounded-full border px-5 py-2 text-sm transition ${
-                      compareView
-                        ? "border-cyan-400/60 bg-cyan-400/20 text-cyan-100"
-                        : "border-neutral-700 bg-neutral-900/60 text-neutral-200 hover:border-neutral-500 hover:text-neutral-100"
-                    }`}
-                    onClick={() => setCompareView((prev) => !prev)}
-                  >
-                    Compare View
-                  </button>
-                </div>
-
-                <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60">
-                  <details className="group px-5 py-4">
-                    <summary className="cursor-pointer text-sm font-medium text-neutral-200 transition group-open:text-emerald-200">
-                      Prompt viewport
-                    </summary>
-                    <div className="mt-4 rounded-xl border border-neutral-800 bg-neutral-950/80 p-4 font-mono text-xs leading-relaxed text-neutral-300">
-                      {promptUsed
-                        ? promptUsed
-                        : "Generate a new version to reveal the live Gemini prompt."}
-                    </div>
-                  </details>
-                </div>
-              </div>
+              <span className="status-pill">
+                {customAnalysis ? "Dynamic" : "Default"}
+              </span>
             </div>
 
-            <div className="rounded-3xl border border-neutral-800 bg-neutral-900/30 p-6">
-              <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-                Identity Configurations
-              </p>
-              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                {identities.map((identity) => (
-                  <button
-                    key={identity.id}
-                    className={`rounded-2xl border px-4 py-3 text-left text-sm transition ${
-                      selectedIdentity.id === identity.id
-                        ? "border-emerald-400/60 bg-emerald-500/10 text-emerald-100"
-                        : "border-neutral-800 bg-neutral-900/60 text-neutral-300 hover:border-neutral-600 hover:text-neutral-100"
-                    }`}
-                    onClick={() => handleSelectIdentity(identity)}
-                  >
-                    <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">
-                      {identity.id}
-                    </p>
-                    <p className="mt-2 font-medium">{identity.title}</p>
-                  </button>
-                ))}
-              </div>
-            </div>
-          </section>
-
-          <aside className="space-y-4">
-            <div className="rounded-3xl border border-neutral-800 bg-neutral-900/40 p-5">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold uppercase tracking-[0.3em] text-neutral-300">
-                  Saved Lives
-                </h3>
-                <button
-                  className="text-xs text-neutral-500 transition hover:text-neutral-300"
-                  onClick={() => setIsHistoryOpen((prev) => !prev)}
-                >
-                  {isHistoryOpen ? "Hide" : "Show"}
-                </button>
-              </div>
-
-              {isHistoryOpen && (
-                <div className="mt-4 space-y-3">
-                  {savedHistory.length === 0 ? (
-                    <p className="rounded-2xl border border-dashed border-neutral-800 px-4 py-6 text-center text-xs text-neutral-500">
-                      Save a portrait to start your session archive.
-                    </p>
-                  ) : (
-                    savedHistory.map((item) => (
-                      <div
-                        key={item.id}
-                        className="flex items-center gap-3 rounded-2xl border border-neutral-800 bg-neutral-950/60 p-3"
-                      >
-                        <img
-                          src={item.image}
-                          alt={item.title}
-                          className="h-16 w-16 rounded-xl border border-neutral-800 object-cover"
-                          onError={handleImageError}
-                        />
-                        <div className="flex-1 space-y-1 text-xs">
-                          <p className="font-semibold text-neutral-200">
-                            {item.title}
-                          </p>
-                          <p className="text-neutral-500">
-                            {new Date(item.timestamp).toLocaleString()}
-                          </p>
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] ${
-                              item.source === "API Gen"
-                                ? "border-emerald-500/40 bg-emerald-500/20 text-emerald-200"
-                                : "border-neutral-700 bg-neutral-800/60 text-neutral-300"
-                            }`}
-                          >
-                            {item.source}
-                          </span>
-                        </div>
-                        <button
-                          className="rounded-full border border-neutral-800 bg-neutral-900/80 p-2 text-neutral-400 transition hover:border-rose-500/40 hover:text-rose-200"
-                          onClick={() => handleDeleteHistory(item.id)}
-                          aria-label="Delete saved life"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 24 24"
-                            fill="currentColor"
-                            className="h-4 w-4"
-                          >
-                            <path d="M9 3a1 1 0 0 0-1 1v1H5.75a.75.75 0 0 0 0 1.5h.62l.7 11.1A2.25 2.25 0 0 0 9.31 20h5.38a2.25 2.25 0 0 0 2.24-2.4l.7-11.1h.62a.75.75 0 0 0 0-1.5H16V4a1 1 0 0 0-1-1H9zm2 5.25c.41 0 .75.34.75.75v7a.75.75 0 0 1-1.5 0v-7c0-.41.34-.75.75-.75zm4 0c.41 0 .75.34.75.75v7a.75.75 0 0 1-1.5 0v-7c0-.41.34-.75.75-.75z" />
-                          </svg>
-                        </button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="rounded-3xl border border-neutral-800 bg-neutral-900/40 p-5 text-xs text-neutral-400">
-              <p className="uppercase tracking-[0.3em] text-neutral-500">
-                Base Anchor
-              </p>
+            <div className="base-preview">
               <img
-                src={BASE_FACE_SRC}
-                alt="Base face"
-                className="mt-3 aspect-[4/5] w-full rounded-2xl border border-neutral-800 object-cover grayscale"
+                src={baseFacePreview}
+                alt="Base face reference"
                 onError={handleImageError}
               />
-              <p className="mt-3 text-[11px] leading-relaxed">
-                The original reference portrait. Use compare view to align this
-                with every mutation.
-              </p>
+            </div>
+
+            <p className="panel-copy">
+              The reference portrait anchors each transformation so every
+              generated life remains connected to the same visual identity.
+            </p>
+
+            <div className="upload-section">
+              <input
+                id="face-upload"
+                className="upload-input"
+                type="file"
+                accept="image/png, image/jpeg"
+                onChange={handleFaceUpload}
+                disabled={isAnalyzing}
+              />
+              <label
+                htmlFor="face-upload"
+                className={`upload-button ${isAnalyzing ? "loading" : ""}`}
+                aria-disabled={isAnalyzing}
+              >
+                {isAnalyzing && <span className="spinner" aria-hidden="true" />}
+                {isAnalyzing
+                  ? "📁 Analyzing features..."
+                  : "Upload Your Own Face"}
+              </label>
+              {analysisMessage && (
+                <p className="upload-status-success">{analysisMessage}</p>
+              )}
+              {analysisError && (
+                <p className="upload-status-warning">{analysisError}</p>
+              )}
             </div>
           </aside>
-        </div>
+
+          <section className="panel portrait-panel">
+            <div className="panel-header">
+              <div>
+                <p className="section-label">Generated Portrait</p>
+                <h2>{selectedIdentity.title}</h2>
+              </div>
+              <span className="status-pill">
+                {isGenerating
+                  ? "Generating"
+                  : displaySource === "api"
+                    ? "API Gen"
+                    : "Curated"}
+              </span>
+            </div>
+
+            <p className="panel-copy">{selectedIdentity.description}</p>
+
+            <div className="portrait-preview">
+              {isGenerating && (
+                <div className="portrait-loading" aria-hidden="true">
+                  <span className="spinner" />
+                </div>
+              )}
+              <img
+                src={displayImage}
+                alt={selectedIdentity.title}
+                className={isGenerating ? "is-generating" : ""}
+                onError={handleImageError}
+              />
+            </div>
+
+            {errorMessage && <p className="error-message">{errorMessage}</p>}
+
+            <div className="action-row">
+              <button
+                className="generate-button"
+                type="button"
+                onClick={handleGenerate}
+                disabled={isGenerating}
+              >
+                {isGenerating ? "Generating..." : "Generate"}
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleDownload}
+                disabled={isGenerating}
+              >
+                Download Portrait
+              </button>
+              <button
+                className="secondary-button"
+                type="button"
+                onClick={handleSaveToHistory}
+              >
+                Save to History
+              </button>
+              <button
+                className={`secondary-button ${compareView ? "active" : ""}`}
+                type="button"
+                onClick={() => setCompareView((prev) => !prev)}
+              >
+                Compare View
+              </button>
+            </div>
+          </section>
+        </section>
+
+        <section className="panel identity-section">
+          <div className="panel-header">
+            <div>
+              <p className="section-label">Identity Personas</p>
+              <h2>Choose a Life</h2>
+            </div>
+          </div>
+
+          <div className="identity-grid">
+            {identities.map((identity) => (
+              <button
+                key={identity.id}
+                className={`identity-card ${
+                  selectedIdentity.id === identity.id ? "selected" : ""
+                }`}
+                type="button"
+                onClick={() => handleSelectIdentity(identity)}
+              >
+                <span>{identity.id}</span>
+                <strong>{identity.title}</strong>
+                <small>{identity.description}</small>
+              </button>
+            ))}
+          </div>
+        </section>
+
+        <section className={`panel compare-view ${compareView ? "open" : ""}`}>
+          <div className="panel-header">
+            <div>
+              <p className="section-label">Compare View</p>
+              <h2>Reference and Transformation</h2>
+            </div>
+            <span className="status-pill">{compareView ? "Open" : "Closed"}</span>
+          </div>
+
+          {compareView ? (
+            <div className="compare-grid">
+              <figure>
+                <img
+                  src={baseFacePreview}
+                  alt="Base face comparison"
+                  onError={handleImageError}
+                />
+                <figcaption>Present Self</figcaption>
+              </figure>
+              <figure>
+                <img
+                  src={displayImage}
+                  alt={`${selectedIdentity.title} comparison`}
+                  onError={handleImageError}
+                />
+                <figcaption>{selectedIdentity.title}</figcaption>
+              </figure>
+            </div>
+          ) : (
+            <p className="empty-state">
+              Compare view is closed. Use the control above to reveal both
+              portraits side by side.
+            </p>
+          )}
+        </section>
+
+        <section className="prompt-box">
+          <div className="panel-header">
+            <div>
+              <p className="section-label">Prompt Details</p>
+              <h2>Generation Prompt</h2>
+            </div>
+          </div>
+          <pre>
+            {promptUsed ||
+              "Generate a new version to reveal the live generation prompt."}
+          </pre>
+        </section>
+
+        <section className="panel saved-history">
+          <div className="panel-header">
+            <div>
+              <p className="section-label">Saved History</p>
+              <h2>Session Archive</h2>
+            </div>
+            <button
+              className="secondary-button compact"
+              type="button"
+              onClick={() => setIsHistoryOpen((prev) => !prev)}
+            >
+              {isHistoryOpen ? "Hide" : "Show"}
+            </button>
+          </div>
+
+          {isHistoryOpen && (
+            <div className="history-grid">
+              {savedHistory.length === 0 ? (
+                <p className="empty-state">
+                  Saved portraits will appear here during this session.
+                </p>
+              ) : (
+                savedHistory.map((item) => (
+                  <article className="history-card" key={item.id}>
+                    <img
+                      src={item.image}
+                      alt={item.title}
+                      onError={handleImageError}
+                    />
+                    <div>
+                      <strong>{item.title}</strong>
+                      <span>{new Date(item.timestamp).toLocaleString()}</span>
+                      <em>{item.source}</em>
+                    </div>
+                    <button
+                      className="icon-button"
+                      type="button"
+                      onClick={() => handleDeleteHistory(item.id)}
+                      aria-label="Delete saved portrait"
+                    >
+                      ×
+                    </button>
+                  </article>
+                ))
+              )}
+            </div>
+          )}
+        </section>
       </div>
-    </div>
+    </main>
   );
 }

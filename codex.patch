@@ -1,0 +1,276 @@
+ (cd "$(git rev-parse --show-toplevel)" && git apply --3way <<'EOF' 
+diff --git a/frontend/src/styles.css b/frontend/src/styles.css
+index 18378f8539337b9f3c9a4d480ecca295cb9e9b3c..f275b309e8f8a5a358f3656b1e7d12e04420e2f1 100644
+--- a/frontend/src/styles.css
++++ b/frontend/src/styles.css
+@@ -1,175 +1,199 @@
++:root {
++  --bg: #f5f5f2;
++  --surface: #ffffff;
++  --surface-soft: #f0f0ec;
++  --text: #131313;
++  --muted: #6b6b6b;
++  --line: #d9d9d4;
++  --accent: #111111;
++  --radius: 8px;
++}
++
+ * {
+   box-sizing: border-box;
+ }
+ 
+ body {
+   margin: 0;
+-  font-family: Arial, sans-serif;
+-  background: #f7f3ee;
+-  color: #222;
++  font-family: "Inter", "Helvetica Neue", Arial, sans-serif;
++  background: var(--bg);
++  color: var(--text);
++  line-height: 1.5;
+ }
+ 
+ .gallery-page {
+-  max-width: 1200px;
++  max-width: 1120px;
+   margin: 0 auto;
+-  padding: 32px 20px;
++  padding: 40px 24px 56px;
+ }
+ 
+ .hero {
+-  text-align: center;
+   margin-bottom: 32px;
++  border-bottom: 1px solid var(--line);
++  padding-bottom: 24px;
+ }
+ 
+ .eyebrow {
++  margin: 0 0 10px;
+   text-transform: uppercase;
+-  letter-spacing: 0.12em;
+-  font-size: 12px;
+-  color: #777;
+-  margin-bottom: 8px;
++  letter-spacing: 0.14em;
++  font-size: 11px;
++  color: var(--muted);
+ }
+ 
+ .hero h1 {
+-  font-size: 44px;
+-  margin: 0 0 12px;
++  margin: 0 0 10px;
++  font-size: clamp(28px, 4.8vw, 46px);
++  font-weight: 600;
++  letter-spacing: -0.02em;
+ }
+ 
+ .hero p {
+-  font-size: 18px;
+-  color: #555;
++  margin: 0;
++  max-width: 68ch;
++  color: var(--muted);
+ }
+ 
+ .main-display {
+   display: grid;
+-  grid-template-columns: 1fr 1.5fr;
+-  gap: 24px;
+-  margin-bottom: 32px;
++  grid-template-columns: minmax(250px, 0.9fr) minmax(0, 1.4fr);
++  gap: 18px;
++  margin-bottom: 26px;
+ }
+ 
+ .base-panel,
+ .portrait-panel {
+-  background: white;
+-  border-radius: 20px;
+-  padding: 20px;
+-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
++  background: var(--surface);
++  border: 1px solid var(--line);
++  border-radius: var(--radius);
++  padding: 16px;
++}
++
++.base-panel h2,
++.portrait-panel h2 {
++  margin: 0 0 10px;
++  font-size: 22px;
++  font-weight: 500;
+ }
+ 
+ .base-panel img,
+ .portrait-panel img {
+   width: 100%;
+-  border-radius: 16px;
+   display: block;
+   object-fit: cover;
++  border-radius: 6px;
++  border: 1px solid var(--line);
+ }
+ 
+ .portrait-heading {
+   display: flex;
+   justify-content: space-between;
+   align-items: start;
+-  gap: 16px;
+-}
+-
+-.portrait-heading h2 {
+-  font-size: 28px;
+-  margin: 0 0 12px;
++  gap: 12px;
+ }
+ 
+ .status-badge {
+-  background: #222;
+-  color: white;
++  border: 1px solid var(--line);
+   border-radius: 999px;
+-  padding: 8px 12px;
+-  font-size: 13px;
++  padding: 5px 10px;
++  font-size: 12px;
++  color: var(--muted);
++  background: var(--surface-soft);
+ }
+ 
+ .portrait-panel p,
+ .base-panel p {
+-  line-height: 1.6;
++  margin: 12px 0 0;
++  color: #2b2b2b;
+ }
+ 
+ .identity-grid {
+   display: grid;
+-  grid-template-columns: repeat(4, 1fr);
+-  gap: 16px;
++  grid-template-columns: repeat(4, minmax(0, 1fr));
++  gap: 10px;
+ }
+ 
+ .identity-card {
+-  border: none;
+-  background: white;
+-  padding: 18px;
+-  border-radius: 16px;
++  border: 1px solid var(--line);
++  background: var(--surface);
++  padding: 14px;
++  border-radius: var(--radius);
+   cursor: pointer;
+   text-align: left;
+-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+-  transition: transform 0.2s ease, background 0.2s ease;
++  transition: border-color 0.2s ease, background-color 0.2s ease;
+ }
+ 
+ .identity-card:hover {
+-  transform: translateY(-4px);
++  border-color: #b6b6b0;
++  background: #fafaf8;
+ }
+ 
+ .identity-card.selected {
+-  background: #222;
+-  color: white;
++  border-color: var(--accent);
++  background: #f7f7f4;
+ }
+ 
+ .identity-card h3 {
+   margin: 0;
+-  font-size: 16px;
++  font-size: 15px;
++  font-weight: 500;
+ }
+ 
+ .generate-button {
+-  margin-top: 12px;
+-  padding: 12px 18px;
+-  border: none;
++  margin-top: 14px;
++  padding: 10px 14px;
++  border: 1px solid var(--accent);
+   border-radius: 999px;
+-  background: #222;
+-  color: white;
++  background: var(--accent);
++  color: #fff;
+   cursor: pointer;
+-  font-size: 15px;
++  font-size: 14px;
++  transition: opacity 0.2s ease;
+ }
+ 
+ .generate-button:disabled {
+-  opacity: 0.6;
++  opacity: 0.65;
+   cursor: not-allowed;
+ }
+ 
+ .loading-image {
+-  opacity: 0.45;
++  opacity: 0.5;
+ }
+ 
+ .error-message {
+-  color: #b00020;
+-  font-weight: bold;
++  color: #9e2222;
++  font-weight: 500;
+ }
+ 
+ .note,
+ .small-text {
+-  font-size: 13px;
+-  color: #666;
++  font-size: 12px;
++  color: var(--muted);
+ }
+ 
+ .prompt-box {
+-  margin-top: 16px;
+-  background: #f5f5f5;
+-  border-radius: 12px;
+-  padding: 12px;
++  margin-top: 14px;
++  border: 1px solid var(--line);
++  border-radius: 6px;
++  background: var(--surface-soft);
++  padding: 10px 12px;
+ }
+ 
+ .prompt-box summary {
+   cursor: pointer;
+-  font-weight: bold;
++  font-weight: 500;
+ }
+ 
+-@media (max-width: 800px) {
++@media (max-width: 860px) {
++  .gallery-page {
++    padding: 28px 16px 40px;
++  }
++
+   .main-display {
+     grid-template-columns: 1fr;
+   }
+ 
+   .identity-grid {
+-    grid-template-columns: repeat(2, 1fr);
+-  }
+-
+-  .hero h1 {
+-    font-size: 32px;
++    grid-template-columns: repeat(2, minmax(0, 1fr));
+   }
+ }
+ 
+EOF
+)
