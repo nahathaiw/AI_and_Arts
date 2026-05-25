@@ -693,6 +693,7 @@ img {
 .prompt-box pre {
   overflow-x: auto;
   white-space: pre-wrap;
+  overflow-wrap: anywhere;
   margin: 0;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 16px;
@@ -1018,6 +1019,11 @@ img {
   .history-card img {
     width: 60px;
     height: 76px;
+  }
+
+  .history-card strong {
+    white-space: normal;
+    text-overflow: clip;
   }
 }
 
