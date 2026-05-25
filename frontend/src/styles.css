@@ -4,6 +4,9 @@
 
 :root {
   color-scheme: dark;
+  --container-max: 1320px;
+  --page-gutter: clamp(16px, 4vw, 40px);
+  --section-gap: 24px;
   --bg: #03040b;
   --bg-soft: #080917;
   --panel: rgba(12, 15, 30, 0.74);
@@ -28,9 +31,11 @@
 html {
   min-height: 100%;
   background: var(--bg);
+  overflow-x: hidden;
 }
 
 body {
+  overflow-x: hidden;
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
@@ -73,19 +78,25 @@ img {
 
 .app-shell,
 .gallery-page {
+  width: 100%;
   min-height: 100vh;
-  padding: 48px 20px 64px;
+  padding: 48px var(--page-gutter) 64px;
 }
 
 .app-container,
 .main-display {
-  width: min(1180px, 100%);
+  width: min(100%, var(--container-max));
   margin: 0 auto;
 }
 
+.app-container {
+  display: grid;
+  gap: var(--section-gap);
+}
+
 .hero {
-  max-width: 800px;
-  margin: 0 auto 36px;
+  width: 100%;
+  margin: 0 auto;
   text-align: center;
 }
 
@@ -449,7 +460,7 @@ img {
 .compare-view,
 .prompt-box,
 .saved-history {
-  margin-top: 22px;
+  margin-top: 0;
 }
 
 .identity-grid {
@@ -617,6 +628,20 @@ img {
   font-size: 0.72rem;
   font-style: normal;
   font-weight: 760;
+}
+
+.diagnostics-footer {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 1.5rem 0 0;
+  text-align: center;
+  opacity: 0.4;
+  font-size: 0.85rem;
+}
+
+.debug-api-url {
+  margin: 0;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.03em;
 }
 
 .icon-button {

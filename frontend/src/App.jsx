@@ -528,8 +528,8 @@ export default function App() {
         </section>
 
         {/* Dynamic deployment diagnostics footer */}
-        <footer style={{ marginTop: "2.5rem", padding: "1.5rem 0", borderTop: "1px solid rgba(255,255,255,0.08)", textAlign: "center", opacity: 0.4, fontSize: "0.85rem" }}>
-          <p className="debug-api-url" style={{ fontFamily: "monospace", letterSpacing: "0.03em" }}>
+        <footer className="diagnostics-footer">
+          <p className="debug-api-url">
             Active Runtime API Target: {API_BASE_URL}
           </p>
         </footer>
