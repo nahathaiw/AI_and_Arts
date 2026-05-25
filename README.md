@@ -140,6 +140,62 @@ npm run dev
 └── README.md
 ```
 
+## Deployment
+
+### Local development
+
+**Backend:**
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+The frontend falls back to `http://localhost:5050` when `VITE_API_BASE_URL` is not set.
+
+### Render backend settings
+
+- **Root Directory:** `backend`
+- **Build Command:** `npm install`
+- **Start Command:** `npm start`
+
+**Environment variables:**
+```bash
+GEMINI_API_KEY=...
+GEMINI_ANALYSIS_MODEL=gemini-2.5-flash
+GEMINI_IMAGE_MODEL=gemini-2.5-flash-image
+FRONTEND_URL=https://your-frontend.vercel.app
+```
+
+### Vercel frontend settings
+
+- **Root Directory:** `frontend`
+- **Framework:** Vite
+- **Build Command:** `npm run build`
+- **Output Directory:** `dist`
+
+**Environment variable:**
+```bash
+VITE_API_BASE_URL=https://your-backend.onrender.com
+```
+
+### Deployment testing checklist
+
+- Open the backend health route: `https://your-backend.onrender.com/api/health`
+- Open the frontend Vercel URL
+- Upload face
+- Analyze face
+- Generate portrait
+- Test Gender-Switched Self toggle
+- Save / Compare / Download
+
 ## How It Works
 
 ### User Workflow
@@ -248,6 +304,17 @@ Replace all placeholder images:
 
 ## API Endpoints
 
+### GET `/api/health`
+Backend health check endpoint for deployment testing.
+
+**Response:**
+```json
+{
+  "success": true,
+  "message": "Backend is running"
+}
+```
+
 ### GET `/`
 Health check endpoint.
 
@@ -304,4 +371,4 @@ This project is for educational purposes. Please respect copyright and obtain pr
 
 - **Concept & Design**: Student Project
 - **AI Technology**: Google Gemini API
-- **Framework**: React + Express
+- **Framework**: React + Express 

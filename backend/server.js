@@ -3,127 +3,94 @@ import cors from "cors";
 import dotenv from "dotenv";
 import fs from "fs";
 import path from "path";
-// 1. Swap OpenAI import for the official Google Gen AI SDK
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { fileURLToPath } from "url";
-import { getCompiledPrompt, identityPrompts, sanitizeAnalysis } from "./prompts.js";
+import { getCompiledPrompt } from "./prompts.js";
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5050;
-const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
-const SUPPORTED_IMAGE_MIME_TYPES = new Set([
-  "image/png",
-  "image/jpeg",
-  "image/webp"
-]);
+const ANALYSIS_MODEL =
+  process.env.GEMINI_ANALYSIS_MODEL || "gemini-2.5-flash";
+const IMAGE_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image";
+
+const FACE_ANALYSIS_FIELDS = [
+  "jawline",
+  "eyes",
+  "nose",
+  "smile",
+  "hair",
+  "marks"
+];
+
+const FACE_ANALYSIS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: FACE_ANALYSIS_FIELDS.reduce((properties, field) => {
+    properties[field] = { type: Type.STRING };
+    return properties;
+  }, {}),
+  required: FACE_ANALYSIS_FIELDS,
+  propertyOrdering: FACE_ANALYSIS_FIELDS
+};
+
+const IDENTITY_TITLES = {
+  present: "The Present Self",
+  childhood: "The Childhood Self",
+  elderly: "The Elderly Self",
+  professor: "The Professor Self",
+  football: "The Football Player Self",
+  gender: "The Gender-Switched Self",
+  artist: "The Artist Self",
+  business: "The Business Self"
+};
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-app.use(cors());
-// Increased JSON limit to accommodate larger base64 exchanges safely
+// Explicitly designated trusted local hosting addresses
+const staticAllowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "http://localhost:3000"
+];
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // 1. Allow non-browser requests or health check pings
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // 2. Allow local engineering development addresses
+      if (staticAllowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      // 3. Match absolute environment dashboard configurations
+      if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL.replace(/\/$/, "")) {
+        return callback(null, true);
+      }
+
+      // 4. BULLETPROOF REGEX MATCH: Matches any vercel.app subdomain that contains "ai-and-arts"
+      const isVercelSubdomain = /^https:\/\/ai-and-arts-.*\.vercel\.app$/.test(origin);
+      if (isVercelSubdomain) {
+        return callback(null, true);
+      }
+
+      // Secure rejection fallback
+      return callback(new Error("Not allowed by CORS"));
+    },
+    credentials: true
+  })
+);
+
 app.use(express.json({ limit: "20mb" }));
 
-// 2. Instantiate the correct Gemini client
 const ai = new GoogleGenAI({
   apiKey: process.env.GEMINI_API_KEY
 });
-
-function getBase64Size(base64Data) {
-  const normalizedData = base64Data.replace(/\s/g, "");
-  const padding = normalizedData.endsWith("==")
-    ? 2
-    : normalizedData.endsWith("=")
-      ? 1
-      : 0;
-
-  return Math.floor((normalizedData.length * 3) / 4) - padding;
-}
-
-function parseImageDataUrl(imageDataUrl) {
-  if (typeof imageDataUrl !== "string") {
-    throw new Error("Missing uploaded image.");
-  }
-
-  const match = imageDataUrl.match(/^data:(image\/(?:png|jpeg|webp));base64,([a-zA-Z0-9+/=\s]+)$/);
-
-  if (!match) {
-    throw new Error("Upload must be a PNG, JPEG, or WebP data URL.");
-  }
-
-  const [, mimeType, rawBase64Data] = match;
-  const data = rawBase64Data.replace(/\s/g, "");
-
-  if (!SUPPORTED_IMAGE_MIME_TYPES.has(mimeType)) {
-    throw new Error("Unsupported image type.");
-  }
-
-  if (getBase64Size(data) > MAX_UPLOAD_BYTES) {
-    throw new Error("Uploaded image is larger than 8MB.");
-  }
-
-  return {
-    mimeType,
-    data,
-    imageBase64: `data:${mimeType};base64,${data}`
-  };
-}
-
-function getDefaultReferenceImage() {
-  const baseFacePath = path.join(__dirname, "base_face.png");
-
-  if (!fs.existsSync(baseFacePath)) {
-    throw new Error("Base face image not found in backend folder.");
-  }
-
-  const imageBuffer = fs.readFileSync(baseFacePath);
-
-  return {
-    mimeType: "image/png",
-    data: imageBuffer.toString("base64"),
-    source: "default"
-  };
-}
-
-function getReferenceImage(customAnalysis) {
-  if (customAnalysis?.imageBase64) {
-    return {
-      ...parseImageDataUrl(customAnalysis.imageBase64),
-      source: "upload"
-    };
-  }
-
-  return getDefaultReferenceImage();
-}
-
-function extractResponseText(response) {
-  if (typeof response?.text === "string") {
-    return response.text;
-  }
-
-  return (response?.candidates?.[0]?.content?.parts || [])
-    .map((part) => part.text || "")
-    .join("")
-    .trim();
-}
-
-function parseJsonResponse(text) {
-  const cleanedText = text
-    .replace(/^```(?:json)?/i, "")
-    .replace(/```$/i, "")
-    .trim();
-
-  const firstBraceIndex = cleanedText.indexOf("{");
-  const lastBraceIndex = cleanedText.lastIndexOf("}");
-
-  if (firstBraceIndex === -1 || lastBraceIndex === -1) {
-    throw new Error("Face analysis did not return JSON.");
-  }
-
-  return JSON.parse(cleanedText.slice(firstBraceIndex, lastBraceIndex + 1));
-}
 
 app.get("/", (req, res) => {
   res.json({
@@ -131,86 +98,104 @@ app.get("/", (req, res) => {
   });
 });
 
+app.get("/api/health", (req, res) => {
+  res.json({ success: true, message: "Backend is running" });
+});
+
 app.post("/api/analyze-face", async (req, res) => {
   try {
-    const referenceImage = parseImageDataUrl(req.body.imageBase64);
-
     if (!process.env.GEMINI_API_KEY) {
       return res.status(500).json({
         success: false,
-        error: "Missing GEMINI_API_KEY. Face analysis requires Gemini."
+        error: "Missing GEMINI_API_KEY. Face analysis is unavailable."
       });
     }
 
-    const analysisPrompt = [
-      "Analyze the attached portrait image and return only raw JSON with exactly these string fields:",
-      "jawline, eyes, nose, smile, hair, skinTone, presentation, marks.",
-      "Describe only visible, image-grounded facial and styling details useful for preserving likeness in a respectful portrait transformation.",
-      "For presentation, describe only visible styling presentation using terms like masculine, feminine, androgynous, neutral, or not clearly visible.",
-      "Do not infer or mention actual gender identity, race, ethnicity, nationality, ancestry, religion, sexuality, age, health, personality, or socioeconomic status.",
-      "If a field is unclear, use a short phrase such as \"not clearly visible\"."
-    ].join("\n");
+    const imageData = parseImageDataUrl(req.body?.imageBase64);
+
+    if (!imageData) {
+      return res.status(400).json({
+        success: false,
+        error: "Please provide a PNG or JPEG imageBase64 data URL."
+      });
+    }
+
+    const analysisPrompt = `Analyze only visible facial features useful for artistic likeness preservation.
+
+Return ONLY this JSON object:
+{
+  "jawline": "description",
+  "eyes": "description",
+  "nose": "description",
+  "smile": "description",
+  "hair": "description",
+  "marks": "description"
+}
+
+Rules:
+- Do not identify the person.
+- Do not infer race, ethnicity, nationality, ancestry, gender identity, age, attractiveness, health, or personality.
+- If something is unclear, write "not clearly visible".
+- Return only valid JSON.`;
 
     const response = await ai.models.generateContent({
-      model: process.env.GEMINI_ANALYSIS_MODEL || "gemini-2.5-flash",
+      model: ANALYSIS_MODEL,
       contents: [
         { text: analysisPrompt },
         {
           inlineData: {
-            mimeType: referenceImage.mimeType,
-            data: referenceImage.data
+            mimeType: imageData.mimeType,
+            data: imageData.base64Data
           }
         }
       ],
       config: {
         responseMimeType: "application/json",
-        systemInstruction: [
-          "You are a cautious facial-feature extraction assistant for an AI art workflow.",
-          "Return only raw JSON. No markdown, no commentary, no extra keys.",
-          "Extract only visible non-sensitive features.",
-          "The presentation field must only describe visible styling, never actual gender identity.",
-          "Never infer race, ethnicity, nationality, ancestry, or other protected identity traits."
-        ].join("\n")
+        responseSchema: FACE_ANALYSIS_SCHEMA
       }
     });
 
-    const parsedAnalysis = parseJsonResponse(extractResponseText(response));
-    const safeAnalysis = sanitizeAnalysis(parsedAnalysis);
+    let parsedAnalysis;
+
+    try {
+      parsedAnalysis = JSON.parse(getResponseText(response));
+    } catch (error) {
+      console.error("Face analysis JSON parse error:", error);
+
+      return res.status(502).json({
+        success: false,
+        error: "Face analysis response was not valid JSON."
+      });
+    }
 
     res.json({
       success: true,
-      faceAnalysis: {
-        ...safeAnalysis,
-        imageBase64: referenceImage.imageBase64,
-        mimeType: referenceImage.mimeType,
-        source: "upload"
-      }
+      faceAnalysis: validateFaceAnalysis(parsedAnalysis)
     });
   } catch (error) {
-    res.status(400).json({
+    console.error("Gemini face analysis error:", error);
+
+    res.status(500).json({
       success: false,
-      error: error.message || "Could not read uploaded image."
+      error: "Face analysis failed. Please try another PNG or JPEG image."
     });
   }
 });
 
 app.post("/api/generate", async (req, res) => {
   try {
-    const { identityId, customAnalysis } = req.body;
+    const {
+      identityId = "present",
+      customAnalysis = null,
+      referenceImageBase64 = null,
+      uploadedFaceBase64 = null,
+      genderOptions = null
+    } = req.body || {};
 
     if (!identityId) {
       return res.status(400).json({
         success: false,
         error: "Missing identityId."
-      });
-    }
-
-    const selectedIdentity = identityPrompts[identityId];
-
-    if (!selectedIdentity) {
-      return res.status(404).json({
-        success: false,
-        error: "Identity concept not found."
       });
     }
 
@@ -222,54 +207,63 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    let referenceImage;
+    const contents = [];
+    const uploadedReferenceImage = parseImageDataUrl(
+      referenceImageBase64 || uploadedFaceBase64
+    );
+    const effectiveCustomAnalysis = uploadedReferenceImage
+      ? customAnalysis
+      : null;
+    const compiledPrompt = getCompiledPrompt(
+      identityId,
+      effectiveCustomAnalysis,
+      {
+        genderOptions
+      }
+    );
 
-    try {
-      referenceImage = getReferenceImage(customAnalysis);
-    } catch (error) {
-      return res.status(500).json({
-        success: false,
-        fallback: true,
-        error: error.message || "Could not load the reference face image."
+    if (uploadedReferenceImage) {
+      contents.push({
+        inlineData: {
+          mimeType: uploadedReferenceImage.mimeType,
+          data: uploadedReferenceImage.base64Data
+        }
+      });
+    } else {
+      const baseFacePath = path.join(__dirname, "base_face.png");
+
+      if (!fs.existsSync(baseFacePath)) {
+        return res.status(500).json({
+          success: false,
+          fallback: true,
+          error: "Base face image not found in backend folder."
+        });
+      }
+
+      const imageBuffer = fs.readFileSync(baseFacePath);
+      const base64Image = imageBuffer.toString("base64");
+
+      contents.push({
+        inlineData: {
+          mimeType: "image/png",
+          data: base64Image
+        }
       });
     }
 
-    // 2. Build the instruction prompt
-    const compiledPrompt = getCompiledPrompt(identityId, customAnalysis);
-    const finalPrompt = [
-      "You are an artistic AI collaborator. Create a polished, high-quality digital art portrait based on this compiled concept prompt:",
-      "",
-      compiledPrompt,
-      "",
-      "Visual reference instructions:",
-      "- Use the attached face image as the visual reference to guide the core facial bone structure, proportions, and identity.",
-      "- If the concept prompt describes demographic details, hair, marks, or facial features that conflict with the attached image, treat the attached image as the source of truth.",
-      "- Transform the medium, clothing, background, lighting, and expression to fully match the concept.",
-      "- Ensure the composition remains a centered portrait suitable for a unified art gallery series."
-    ].join("\n");
+    contents.push({ text: compiledPrompt });
 
-    // 4. Use generateContent with IMAGE response modalities
     const response = await ai.models.generateContent({
-      model: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
-      contents: [
-        { text: finalPrompt },
-        {
-          inlineData: {
-            mimeType: referenceImage.mimeType,
-            data: referenceImage.data
-          }
-        }
-      ],
+      model: IMAGE_MODEL,
+      contents,
       config: {
         responseModalities: ["TEXT", "IMAGE"]
       }
     });
 
-    // 5. Extract the generated image item parts correctly
-    const parts = response?.candidates?.[0]?.content?.parts || [];
-    const imagePart = parts.find((part) => part.inlineData?.data);
+    const generatedImage = extractGeneratedImage(response);
 
-    if (!imagePart) {
+    if (!generatedImage) {
       return res.status(500).json({
         success: false,
         fallback: true,
@@ -277,18 +271,14 @@ app.post("/api/generate", async (req, res) => {
       });
     }
 
-    const mimeType = imagePart.inlineData.mimeType || "image/png";
-    const imageBase64 = imagePart.inlineData.data;
-
-    // 6. Return the data payload exactly how the frontend expects it
     res.json({
       success: true,
       provider: "gemini",
-      model: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
-      referenceSource: referenceImage.source,
-      title: selectedIdentity.title,
-      promptUsed: finalPrompt,
-      image: `data:${mimeType};base64,${imageBase64}`
+      model: IMAGE_MODEL,
+      title: IDENTITY_TITLES[identityId] || IDENTITY_TITLES.present,
+      promptUsed: compiledPrompt,
+      imageUrl: generatedImage.imageUrl,
+      image: generatedImage.imageUrl
     });
 
   } catch (error) {
@@ -300,11 +290,97 @@ app.post("/api/generate", async (req, res) => {
       error: "Live Gemini generation failed. Showing curated gallery image instead."
     });
   }
-}); // <--- End of app.post
+});
 
-// =========================================================
-//  FIX: Added server listener to keep process alive!
-// =========================================================
+function parseImageDataUrl(imageBase64) {
+  if (typeof imageBase64 !== "string") {
+    return null;
+  }
+
+  const match = imageBase64.match(
+    /^data:(image\/png|image\/jpeg);base64,([A-Za-z0-9+/=\s]+)$/i
+  );
+
+  if (!match) {
+    return null;
+  }
+
+  const mimeType = match[1].toLowerCase();
+  const base64Data = match[2].replace(/\s/g, "");
+
+  const base64Pattern =
+    /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+
+  if (!base64Data || !base64Pattern.test(base64Data)) {
+    return null;
+  }
+
+  return {
+    mimeType,
+    base64Data
+  };
+}
+
+function validateFaceAnalysis(value) {
+  const source =
+    value && typeof value === "object" && !Array.isArray(value) ? value : {};
+
+  return FACE_ANALYSIS_FIELDS.reduce((analysis, field) => {
+    const fieldValue = source[field];
+    const trimmedValue =
+      typeof fieldValue === "string" ? fieldValue.trim() : "";
+
+    analysis[field] = trimmedValue || "not clearly visible";
+
+    return analysis;
+  }, {});
+}
+
+function getResponseText(response) {
+  if (typeof response?.text === "string") {
+    return response.text.trim();
+  }
+
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+
+  return parts
+    .map((part) => part.text || "")
+    .join("")
+    .trim();
+}
+
+function extractGeneratedImage(response) {
+  const parts = response?.candidates?.[0]?.content?.parts || [];
+  const imagePart = parts.find((part) => part.inlineData?.data);
+
+  if (imagePart) {
+    const mimeType = imagePart.inlineData.mimeType || "image/png";
+    const imageBase64 = imagePart.inlineData.data;
+
+    return {
+      imageUrl: `data:${mimeType};base64,${imageBase64}`
+    };
+  }
+
+  const legacyImage = response?.data?.image;
+
+  if (typeof legacyImage === "string" && legacyImage.startsWith("data:")) {
+    return {
+      imageUrl: legacyImage
+    };
+  }
+
+  if (legacyImage?.data) {
+    const mimeType = legacyImage.mimeType || "image/png";
+
+    return {
+      imageUrl: `data:${mimeType};base64,${legacyImage.data}`
+    };
+  }
+
+  return null;
+}
+
 app.listen(PORT, () => {
   console.log(`Gemini backend running at http://localhost:${PORT}`);
 });

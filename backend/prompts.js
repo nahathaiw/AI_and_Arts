@@ -49,102 +49,130 @@ export const identityPrompts = {
   }
 };
 
-export const identityConcepts = {
-  present: "raw realistic present-day studio portrait",
-  childhood: "nostalgic late-1990s childhood family album portrait",
-  elderly: "dignified elderly close-up portrait with realistic aging",
-  professor: "late-30s university professor editorial portrait",
-  football: "professional football player dramatic sports portrait",
-  gender: "alternate visible gender presentation studio portrait",
-  artist: "independent creative painter documentary studio portrait",
-  business: "young business executive professional corporate portrait"
-};
-
-const ANALYSIS_FIELDS = [
+const analysisFields = [
   "jawline",
   "eyes",
   "nose",
   "smile",
   "hair",
-  "skinTone",
-  "presentation",
   "marks"
 ];
 
-const ANALYSIS_FALLBACKS = {
-  jawline: "not clearly visible",
-  eyes: "not clearly visible",
-  nose: "not clearly visible",
-  smile: "not clearly visible",
-  hair: "not clearly visible",
-  skinTone: "natural visible skin tone from the reference image",
-  presentation: "neutral visible presentation",
-  marks: "no clearly visible distinguishing marks"
+const analysisFallbacks = {
+  jawline: "natural visible face shape",
+  eyes: "natural visible eye shape",
+  nose: "natural visible nose shape",
+  smile: "natural visible expression",
+  hair: "natural visible hairstyle",
+  marks: "no clearly visible distinct marks"
 };
 
-function cleanAnalysisValue(value) {
-  if (typeof value !== "string") {
-    return "";
+const dynamicPromptConcepts = {
+  present:
+    "A raw, unedited, high-resolution DSLR studio headshot of the uploaded person as their present self. Preserve the exact same face, same identity, same visible presentation, same natural complexion, and same facial structure. Neutral studio background, soft professional diffused lighting, natural skin texture.",
+
+  childhood:
+    "A nostalgic warm-toned childhood portrait of the uploaded person reimagined as a child version of the same person. Preserve recognizable identity cues from the uploaded face. Do not recast the person as a different child. Keep the same visible ancestry/complexion and facial identity. Only make age-related changes such as softer cheeks and younger proportions. Warm family album feeling, natural film grain.",
+
+  elderly:
+    "A realistic elderly portrait of the uploaded person. Preserve the same skull proportions, eyes, nose, face shape, natural complexion, and distinct marks. Only add natural aging details such as wrinkles, mature facial texture, and aged hair. Elegant studio portrait lighting.",
+
+  professor:
+    "A professional university professor portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, glasses if appropriate, lighting, and academic office setting.",
+
+  football:
+    "An intense athletic football player portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, expression intensity, stadium lighting, and sports setting.",
+
+  gender:
+    "A respectful alternate gender-presentation portrait of the uploaded person. This is the only identity allowed to alter gender presentation. Change only hairstyle, clothing, and styling toward an alternate presentation. Do not change eyes, nose, mouth shape, jawline, skin tone, or face proportions. Do not claim or infer actual gender identity. Natural, realistic, respectful studio portrait.",
+
+  artist:
+    "A documentary-style creative painter portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change clothing, art studio setting, lighting, and creative styling.",
+
+  business:
+    "A premium corporate portrait of the uploaded person. Preserve the same face, visible presentation, natural complexion, and identity. Only change suit/clothing, office setting, and lighting."
+};
+
+const dynamicIdentityAnchor = `Use the uploaded reference image as the primary identity anchor.
+Generate the same person from the uploaded reference image.
+Do not replace the face with a different person.
+Do not change the core facial structure.
+Do not change the natural complexion.
+Do not change visible racial or ethnic appearance.
+Do not change visible gender presentation, except only for the gender identity card.
+Preserve the same recognizable eyes, nose, jawline, mouth shape, facial proportions, hairstyle family, and distinct marks.
+Only transform clothing, age, lighting, setting, mood, and persona.
+Photorealistic portrait.
+Natural skin texture.
+No cartoon, no anime, no exaggerated beautification.
+No random new person.`;
+
+export function getCompiledPrompt(identityId, customAnalysis = null, options = {}) {
+  const selectedIdentityId = identityPrompts[identityId] ? identityId : "present";
+
+  if (!hasValidCustomAnalysis(customAnalysis)) {
+    return identityPrompts[selectedIdentityId].prompt;
   }
 
-  return value
-    .replace(/[{}<>]/g, "")
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 240)
-    .trim();
+  const analysis = sanitizeAnalysis(customAnalysis);
+  const concept =
+    selectedIdentityId === "gender"
+      ? getGenderTargetConcept(options?.genderOptions?.targetPresentation)
+      : dynamicPromptConcepts[selectedIdentityId];
+
+  return `${concept}
+
+${dynamicIdentityAnchor}
+
+Uploaded face analysis:
+Jawline / face shape: ${analysis.jawline}
+Eyes: ${analysis.eyes}
+Nose: ${analysis.nose}
+Smile / expression: ${analysis.smile}
+Hair: ${analysis.hair}
+Distinct marks: ${analysis.marks}`;
 }
 
-export function hasValidCustomAnalysis(customAnalysis) {
-  if (!customAnalysis || typeof customAnalysis !== "object") {
+function getGenderTargetConcept(targetPresentation) {
+  if (targetPresentation === "masculine") {
+    return "Create a respectful masculine-presenting alternate portrait of the uploaded person. This is a visual styling transformation, not a statement about the person’s real gender identity. Preserve the same underlying person, same facial identity, same natural complexion, same eyes, same nose, same mouth shape, same jawline structure, same facial proportions, and same identity marks. Do not create a different person. Do not change race, ethnicity, visible ancestry, or natural complexion. Shift only visible styling cues toward a masculine presentation: hairstyle shape, clothing, grooming, pose, and fashion styling. Keep it natural and photorealistic. Avoid exaggerated masculinization or face replacement.";
+  }
+
+  return "Create a respectful feminine-presenting alternate portrait of the uploaded person. This is a visual styling transformation, not a statement about the person’s real gender identity. Preserve the same underlying person, same facial identity, same natural complexion, same eyes, same nose, same mouth shape, same jawline structure, same facial proportions, and same identity marks. Do not create a different person. Do not change race, ethnicity, visible ancestry, or natural complexion. Shift only visible styling cues toward a feminine presentation: hairstyle shape, clothing, grooming, pose softness, and fashion styling. Keep it natural and photorealistic. Avoid exaggerated makeup, beauty-filter effects, or overly idealized features.";
+}
+
+function hasValidCustomAnalysis(customAnalysis) {
+  if (
+    !customAnalysis ||
+    typeof customAnalysis !== "object" ||
+    Array.isArray(customAnalysis)
+  ) {
     return false;
   }
 
-  return ANALYSIS_FIELDS.some((field) => cleanAnalysisValue(customAnalysis[field]).length > 0);
+  return analysisFields.some((field) => {
+    const value = customAnalysis[field];
+
+    if (typeof value !== "string") {
+      return false;
+    }
+
+    return sanitizeAnalysisValue(value).length > 0;
+  });
 }
 
-export function sanitizeAnalysis(customAnalysis = {}) {
-  return ANALYSIS_FIELDS.reduce((analysis, field) => {
-    const sanitizedValue = cleanAnalysisValue(customAnalysis[field]);
+function sanitizeAnalysis(customAnalysis) {
+  return analysisFields.reduce((analysis, field) => {
+    const value = customAnalysis[field];
+    const sanitizedValue =
+      typeof value === "string" ? sanitizeAnalysisValue(value) : "";
 
-    analysis[field] = sanitizedValue || ANALYSIS_FALLBACKS[field];
+    analysis[field] = sanitizedValue || analysisFallbacks[field];
 
     return analysis;
   }, {});
 }
 
-export function getCompiledPrompt(identityId, customAnalysis) {
-  const selectedIdentity = identityPrompts[identityId];
-
-  if (!selectedIdentity) {
-    return "";
-  }
-
-  if (!hasValidCustomAnalysis(customAnalysis)) {
-    return selectedIdentity.prompt;
-  }
-
-  const concept = identityConcepts[identityId] || selectedIdentity.title;
-  const analysis = sanitizeAnalysis(customAnalysis);
-
-  return [
-    `Create a polished, high-quality photographic portrait for the AI art project "The Many Lives of One Face."`,
-    `Identity concept: ${concept}.`,
-    "Use the attached face image as the visual source of truth and preserve the same person's visible facial identity.",
-    "User-provided visible feature analysis to preserve:",
-    `- Jawline / face shape: ${analysis.jawline}`,
-    `- Eyes: ${analysis.eyes}`,
-    `- Nose: ${analysis.nose}`,
-    `- Smile / mouth: ${analysis.smile}`,
-    `- Hair: ${analysis.hair}`,
-    `- Visible skin tone and texture: ${analysis.skinTone}`,
-    `- Visible styling presentation only: ${analysis.presentation}`,
-    `- Distinguishing visible marks: ${analysis.marks}`,
-    "Safety and representation rules:",
-    "- The presentation field describes only visible styling such as masculine, feminine, androgynous, neutral, or not clearly visible.",
-    "- Never infer or state actual gender identity, race, ethnicity, nationality, ancestry, or other protected identity traits from the image.",
-    "- If a requested concept conflicts with the uploaded face, preserve the uploaded face and only transform clothing, setting, age styling, lighting, expression, and art direction.",
-    "- Keep the result respectful, natural, photorealistic, centered as a portrait, and consistent with a unified gallery series."
-  ].join("\n");
+function sanitizeAnalysisValue(value) {
+  return value.replace(/[{}<>]/g, "").trim().slice(0, 240);
 }

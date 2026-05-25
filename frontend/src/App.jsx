@@ -2,9 +2,35 @@ import { useState } from "react";
 import axios from "axios";
 import { identities } from "./data/identities";
 
-const API_BASE_URL = "http://localhost:5050";
+// ==========================================
+// SAFE RUNTIME API BASE URL CONFIGURATION
+// ==========================================
+const RENDER_API_BASE_URL = "https://the-many-lives-of-one-face.onrender.com";
+
+function getApiBaseUrl() {
+  const envUrl = import.meta.env.VITE_API_BASE_URL;
+
+  if (envUrl && typeof envUrl === "string") {
+    return envUrl.replace(/\/$/, "");
+  }
+
+  // Fallback dynamic verification based on the browser's active window location
+  const isLocalhost =
+    window.location.hostname === "localhost" ||
+    window.location.hostname === "127.0.0.1";
+
+  // If browsing on local computer, target the local server. Otherwise, force Render.
+  return isLocalhost ? "http://localhost:5050" : RENDER_API_BASE_URL;
+}
+
+const API_BASE_URL = getApiBaseUrl();
+
+// Debug context outputs printed natively into browser developer console logs
+console.log("VITE_API_BASE_URL:", import.meta.env.VITE_API_BASE_URL);
+console.log("Current Browser Hostname:", window.location.hostname);
+console.log("Resolved API Target URL:", API_BASE_URL);
+
 const BASE_FACE_SRC = "/images/base_face.png";
-const SUPPORTED_UPLOAD_TYPES = ["image/png", "image/jpeg", "image/webp"];
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -37,6 +63,8 @@ export default function App() {
   const [savedHistory, setSavedHistory] = useState([]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(true);
   const [customAnalysis, setCustomAnalysis] = useState(null);
+  const [uploadedFaceBase64, setUploadedFaceBase64] = useState(null);
+  const [targetPresentation, setTargetPresentation] = useState("feminine");
   const [baseFacePreview, setBaseFacePreview] = useState(BASE_FACE_SRC);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisMessage, setAnalysisMessage] = useState("");
@@ -58,7 +86,10 @@ export default function App() {
     try {
       const response = await axios.post(`${API_BASE_URL}/api/generate`, {
         identityId: selectedIdentity.id,
-        customAnalysis
+        customAnalysis,
+        referenceImageBase64: uploadedFaceBase64,
+        genderOptions:
+          selectedIdentity.id === "gender" ? { targetPresentation } : null
       });
       const generatedImage = response.data.imageUrl || response.data.image;
 
@@ -97,16 +128,18 @@ export default function App() {
     setAnalysisMessage("");
     setAnalysisError("");
 
-    if (!SUPPORTED_UPLOAD_TYPES.includes(file.type)) {
+    if (!["image/png", "image/jpeg"].includes(file.type)) {
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
-      setAnalysisError("Please upload a PNG, JPEG, or WebP image.");
+      setAnalysisError("Please upload a PNG or JPEG image.");
       input.value = "";
       return;
     }
 
     if (file.size > 8 * 1024 * 1024) {
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
       setAnalysisError("Please upload an image smaller than 8MB.");
       input.value = "";
@@ -118,6 +151,7 @@ export default function App() {
     try {
       const dataUrl = await fileToDataUrl(file);
       setBaseFacePreview(dataUrl);
+      setUploadedFaceBase64(dataUrl);
 
       const response = await axios.post(`${API_BASE_URL}/api/analyze-face`, {
         imageBase64: dataUrl
@@ -125,7 +159,8 @@ export default function App() {
 
       if (response.data.success && response.data.faceAnalysis) {
         setCustomAnalysis(response.data.faceAnalysis);
-        setAnalysisMessage("✓ Uploaded face reference active!");
+        setAnalysisMessage("✓ Dynamic likeness analysis active!");
+        setAnalysisError("");
       } else {
         throw new Error(
           response.data.error || "Face analysis did not return usable data."
@@ -134,6 +169,7 @@ export default function App() {
     } catch (error) {
       console.error(error);
       setCustomAnalysis(null);
+      setUploadedFaceBase64(null);
       setBaseFacePreview(BASE_FACE_SRC);
       setAnalysisError(
         "Could not analyze this image. Using default face instead."
@@ -246,7 +282,7 @@ export default function App() {
                 id="face-upload"
                 className="upload-input"
                 type="file"
-                accept={SUPPORTED_UPLOAD_TYPES.join(", ")}
+                accept="image/png, image/jpeg"
                 onChange={handleFaceUpload}
                 disabled={isAnalyzing}
               />
@@ -286,6 +322,32 @@ export default function App() {
 
             <p className="panel-copy">{selectedIdentity.description}</p>
 
+            {selectedIdentity.id === "gender" && (
+              <div className="gender-toggle" aria-label="Gender target look">
+                <p className="gender-toggle-label">Target Look:</p>
+                <div className="gender-toggle-buttons">
+                  <button
+                    className={`gender-toggle-button ${
+                      targetPresentation === "masculine" ? "active" : ""
+                    }`}
+                    type="button"
+                    onClick={() => setTargetPresentation("masculine")}
+                  >
+                    Masculine Version
+                  </button>
+                  <button
+                    className={`gender-toggle-button ${
+                      targetPresentation === "feminine" ? "active" : ""
+                    }`}
+                    type="button"
+                    onClick={() => setTargetPresentation("feminine")}
+                  >
+                    Feminine Version
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="portrait-preview">
               {isGenerating && (
                 <div className="portrait-loading" aria-hidden="true">
@@ -307,9 +369,13 @@ export default function App() {
                 className="generate-button"
                 type="button"
                 onClick={handleGenerate}
-                disabled={isGenerating}
+                disabled={isGenerating || isAnalyzing}
               >
-                {isGenerating ? "Generating..." : "Generate"}
+                {isGenerating
+                  ? "Generating..."
+                  : isAnalyzing
+                    ? "Analyzing..."
+                    : "Generate"}
               </button>
               <button
                 className="secondary-button"
@@ -337,7 +403,7 @@ export default function App() {
           </section>
         </section>
 
-        <section className="panel identity-section">
+        <section className="panel lower-section identity-section">
           <div className="panel-header">
             <div>
               <p className="section-label">Identity Personas</p>
@@ -363,7 +429,11 @@ export default function App() {
           </div>
         </section>
 
-        <section className={`panel compare-view ${compareView ? "open" : ""}`}>
+        <section
+          className={`panel lower-section compare-view ${
+            compareView ? "open" : ""
+          }`}
+        >
           <div className="panel-header">
             <div>
               <p className="section-label">Compare View</p>
@@ -399,7 +469,7 @@ export default function App() {
           )}
         </section>
 
-        <section className="prompt-box">
+        <section className="prompt-box lower-section prompt-section">
           <div className="panel-header">
             <div>
               <p className="section-label">Prompt Details</p>
@@ -412,7 +482,7 @@ export default function App() {
           </pre>
         </section>
 
-        <section className="panel saved-history">
+        <section className="panel lower-section saved-history">
           <div className="panel-header">
             <div>
               <p className="section-label">Saved History</p>
@@ -460,6 +530,13 @@ export default function App() {
             </div>
           )}
         </section>
+
+        {/* Dynamic deployment diagnostics footer */}
+        <footer className="diagnostics-footer">
+          <p className="debug-api-url">
+            Active Runtime API Target: {API_BASE_URL}
+          </p>
+        </footer>
       </div>
     </main>
   );
