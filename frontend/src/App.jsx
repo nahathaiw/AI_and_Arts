@@ -403,7 +403,7 @@ export default function App() {
           </section>
         </section>
 
-        <section className="panel identity-section">
+        <section className="panel lower-section identity-section">
           <div className="panel-header">
             <div>
               <p className="section-label">Identity Personas</p>
@@ -429,7 +429,11 @@ export default function App() {
           </div>
         </section>
 
-        <section className={`panel compare-view ${compareView ? "open" : ""}`}>
+        <section
+          className={`panel lower-section compare-view ${
+            compareView ? "open" : ""
+          }`}
+        >
           <div className="panel-header">
             <div>
               <p className="section-label">Compare View</p>
@@ -465,7 +469,7 @@ export default function App() {
           )}
         </section>
 
-        <section className="prompt-box">
+        <section className="prompt-box lower-section prompt-section">
           <div className="panel-header">
             <div>
               <p className="section-label">Prompt Details</p>
@@ -478,7 +482,7 @@ export default function App() {
           </pre>
         </section>
 
-        <section className="panel saved-history">
+        <section className="panel lower-section saved-history">
           <div className="panel-header">
             <div>
               <p className="section-label">Saved History</p>
